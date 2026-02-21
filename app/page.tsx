@@ -19,9 +19,14 @@ export default async function Home() {
       {/* Hero */}
       <section
         className="relative overflow-hidden border-b"
-        style={{ background: "var(--section)", borderColor: "var(--border)" }}
+        style={{ background: "var(--background)", borderColor: "var(--border)" }}
       >
-        <div className="relative mx-auto max-w-6xl px-5 py-28 flex flex-col items-center text-center md:items-start md:text-left sm:px-6 sm:py-36 md:px-8 md:py-40">
+        {/* Subtle Decorative UI Pattern & Glow */}
+        <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
+        <div className="absolute left-0 right-0 top-0 -z-0 m-auto h-[310px] w-[310px] rounded-full bg-blue-500 opacity-[0.10] blur-[100px] md:h-[450px] md:w-[450px]" />
+        <div className="absolute bottom-0 right-1/4 -z-0 h-[250px] w-[250px] rounded-full bg-[var(--foreground)] opacity-[0.03] blur-[80px]" />
+
+        <div className="relative z-10 mx-auto max-w-6xl px-5 py-28 flex flex-col items-center text-center md:items-start md:text-left sm:px-6 sm:py-36 md:px-8 md:py-40">
           <h1 className="font-heading max-w-2xl text-4xl font-bold tracking-tight text-[var(--foreground)] sm:text-5xl md:text-6xl">
             {pageContent?.title ?? "Transform Your Space"}
           </h1>

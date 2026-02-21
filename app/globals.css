@@ -6,27 +6,30 @@
   Strong contrast for accessibility and visual comfort.
 */
 
-/* Dark mode — near-black background, off-white text */
+/* Dark mode — matching the warmer dark grey from reference */
 :root,
 .dark {
-  --background: #0a0a0a;
-  --section: #141414;
-  --foreground: #fafafa;
-  --muted: #a1a1a1;
-  --card: #171717;
-  --card-border: #262626;
-  --border: #262626;
-  --button: #fafafa;
-  --button-hover: #e5e5e5;
-  --button-text: #0a0a0a;
-  --accent: #fafafa;
-  --accent-hover: #e5e5e5;
-  --muted-bg: #262626;
-  --danger: #dc2626;
-  --nav-bg: #0a0a0a;
-  --nav-border: #262626;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --background: #141516;
+  /* Color matched from reference background */
+  --section: #1e1f21;
+  --foreground: #f3f4f6;
+  --muted: #9ca3af;
+  --card: #1e1f21;
+  --card-border: #2d2e30;
+  --border: #2d2e30;
+  --button: #f3f4f6;
+  --button-hover: #e5e7eb;
+  --button-text: #111827;
+  --accent: #f3f4f6;
+  --accent-hover: #e5e7eb;
+  --muted-bg: #2d2e30;
+  --danger: #ef4444;
+  --nav-bg: #111213;
+  /* Very dark top nav matching reference */
+  --nav-border: #2d2e30;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
 }
+
 /* Force nav to be fully opaque (no transparency) */
 
 /* Light mode — white background, near-black text */
