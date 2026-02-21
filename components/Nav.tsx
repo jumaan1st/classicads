@@ -12,7 +12,7 @@ const mainNavLinks = [
   { href: "/services", label: "Services", icon: Sofa },
   { href: "/projects", label: "Projects", icon: Brush },
   { href: "/about", label: "About", icon: Users },
-  { href: "/quote", label: "Quote", icon: FileSignature },
+  { href: "/contact", label: "Contact", icon: PhoneCall },
 ];
 
 export default function Nav() {
@@ -95,8 +95,8 @@ export default function Nav() {
                     <Link
                       href={href}
                       className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[15px] font-medium transition-smooth ${isActive
-                          ? "text-[var(--foreground)]"
-                          : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                        ? "text-[var(--foreground)]"
+                        : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
                         }`}
                     >
                       <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2 : 1.5} />
@@ -108,19 +108,8 @@ export default function Nav() {
             </ul>
           </div>
 
-          {/* CONTROLS (Theme, Contact, Dashboard, Login, Hamburger) */}
+          {/* CONTROLS (Theme, Dashboard, Login, Hamburger) */}
           <div className="flex items-center gap-2 sm:gap-3">
-
-            {/* Contact Button (shown next to dashboard/login on larger screens like in reference image) */}
-            <div className="hidden lg:block">
-              <Link
-                href="/contact"
-                className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-2.5 text-[15px] font-medium text-[var(--foreground)] transition-smooth hover:bg-[var(--muted-bg)]"
-              >
-                <PhoneCall className="h-[18px] w-[18px]" strokeWidth={1.5} />
-                Contact
-              </Link>
-            </div>
 
             <button
               type="button"
@@ -171,8 +160,8 @@ export default function Nav() {
                 <Link
                   href={href}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-medium transition-smooth ${isActive
-                      ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
-                      : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                    ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
+                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
                     }`}
                 >
                   <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2 : 1.5} />
@@ -195,8 +184,8 @@ export default function Nav() {
                   href={href}
                   aria-label={label}
                   className={`flex items-center justify-center p-2.5 rounded-[14px] transition-smooth ${isActive
-                      ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
-                      : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                    ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
+                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
                     }`}
                 >
                   <Icon className="h-5 w-5" strokeWidth={isActive ? 2 : 1.5} />
@@ -225,16 +214,6 @@ export default function Nav() {
               </button>
             </div>
             <ul className="flex flex-col gap-2 relative">
-              <li>
-                <Link
-                  href="/contact"
-                  className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[var(--muted)] border border-transparent hover:border-[var(--border)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)] transition-smooth"
-                  onClick={() => setOpen(false)}
-                >
-                  <PhoneCall className="h-5 w-5" strokeWidth={1.5} />
-                  Contact
-                </Link>
-              </li>
               <li>
                 <Link
                   href="/dashboard"
