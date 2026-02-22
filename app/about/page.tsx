@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Award, Users, Target, Sparkles, CheckCircle2, Zap, Shield, Star } from "lucide-react";
+
 
 type PageContent = { title: string; description: string };
 
@@ -44,45 +46,81 @@ export default function AboutPage() {
   return (
     <div className="bg-[var(--background)] min-h-screen">
 
-      {/* ── HERO ────────────────────────────────────────── */}
-      <section className="relative overflow-hidden border-b border-[var(--border)] pt-12 pb-16 sm:pt-20 md:pt-28 md:pb-24">
+      {/* ── HERO (combined with owner) ────────────────── */}
+      <section className="relative overflow-hidden border-b border-[var(--border)] pt-12 pb-16 sm:pt-20 md:pt-24 md:pb-24">
         {/* Grid bg */}
         <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
         {/* Glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[300px] w-[300px] sm:h-[500px] sm:w-[500px] rounded-full bg-blue-500/10 blur-[150px] pointer-events-none" />
+        <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-blue-500/10 blur-[140px] pointer-events-none" />
 
-        <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center">
-          <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[var(--border)] bg-[var(--background)] shadow-sm mb-6 sm:mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-full">
-            <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" />
-            <span className="text-xs sm:text-sm font-semibold text-[var(--foreground)] truncate">Award-Winning Design Agency</span>
-          </div>
+        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-16 lg:gap-24">
 
-          <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-[var(--foreground)] leading-[1.05] animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150">
-            {content?.title ?? "We Design Spaces,"}
-            <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
-              We Build Legacies.
-            </span>
-          </h1>
+            {/* ── Left: text ── */}
+            <div className="flex-1 text-center md:text-left flex flex-col items-center md:items-start">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--background)] shadow-sm mb-6">
+                <Award className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+                <span className="text-xs font-semibold text-[var(--foreground)]">Premium Interior &amp; Exterior Design</span>
+              </div>
 
-          <p className="mt-6 sm:mt-8 text-base sm:text-lg md:text-xl text-[var(--muted)] leading-relaxed max-w-2xl animate-in fade-in slide-in-from-bottom-8 duration-700 delay-300">
-            {content?.description ??
-              "ClassicAds has been transforming interiors and exteriors for over a decade. We engineer environments that inspire, function, and endure — built around your vision."}
-          </p>
+              <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[var(--foreground)] leading-[1.05] mb-4">
+                {content?.title ?? "Crafting Beautiful"}
+                <br />
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-500">
+                  Spaces &amp; Interiors.
+                </span>
+              </h1>
 
-          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto animate-in fade-in slide-in-from-bottom-10 duration-700 delay-500">
-            <Link
-              href="/contact"
-              className="w-full sm:w-auto inline-flex justify-center items-center gap-2 bg-[var(--foreground)] text-[var(--background)] px-6 sm:px-8 py-3.5 rounded-xl font-semibold text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
-            >
-              Work With Us <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/projects"
-              className="w-full sm:w-auto inline-flex justify-center items-center gap-2 border border-[var(--border)] text-[var(--foreground)] px-6 sm:px-8 py-3.5 rounded-xl font-semibold text-base hover:bg-[var(--muted-bg)] transition-all"
-            >
-              View Portfolio
-            </Link>
+              <p className="text-base sm:text-lg text-[var(--muted)] leading-relaxed max-w-xl mb-8">
+                {content?.description ??
+                  "ClassicAds delivers high-quality interior and exterior design tailored to your vision. Every project is handled personally — with care, skill, and transparency from start to finish."}
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                <Link
+                  href="/contact"
+                  className="w-full sm:w-auto inline-flex justify-center items-center gap-2 bg-[var(--foreground)] text-[var(--background)] px-6 sm:px-8 py-3.5 rounded-xl font-semibold text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
+                >
+                  Work With Us <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/projects"
+                  className="w-full sm:w-auto inline-flex justify-center items-center gap-2 border border-[var(--border)] text-[var(--foreground)] px-6 sm:px-8 py-3.5 rounded-xl font-semibold text-base hover:bg-[var(--muted-bg)] transition-all"
+                >
+                  View Portfolio
+                </Link>
+              </div>
+            </div>
+
+            {/* ── Right: owner photo ── */}
+            <div className="flex-shrink-0 flex flex-col items-center gap-4">
+              {/* Photo */}
+              <div className="relative">
+                <div className="h-52 w-52 sm:h-64 sm:w-64 md:h-72 md:w-72 rounded-[2rem] overflow-hidden border-4 border-[var(--border)] shadow-2xl relative">
+                  {/* Replace src with your actual photo: /images/owner.jpg */}
+                  <Image
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&q=80"
+                    alt="Owner"
+                    fill
+                    priority
+                    className="object-cover"
+                    sizes="(max-width:768px) 208px, 288px"
+                  />
+                </div>
+                {/* Owner badge */}
+                <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[var(--card)] border border-[var(--border)] shadow-lg rounded-2xl px-4 py-2 flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-sm font-bold text-[var(--foreground)]">Owner · ClassicAds</span>
+                </div>
+              </div>
+
+              {/* Name + quote */}
+              <div className="mt-6 text-center max-w-[260px]">
+                <p className="font-heading text-xl font-bold text-[var(--foreground)]">Owner Name</p>
+                <p className="text-xs text-[var(--muted)] mt-1 italic">&ldquo;Your space, transformed with care.&rdquo;</p>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -141,16 +179,16 @@ export default function AboutPage() {
           </div>
 
           {/* Cards */}
-          <div className="grid grid-cols-2 gap-4 sm:gap-5">
+          <div className="grid grid-cols-2 gap-4 sm:gap-5 items-stretch">
             {[
-              { icon: Target, title: "Precision", desc: "Every angle meticulously calculated.", shifted: false },
-              { icon: Users, title: "Collaboration", desc: "Your vision, amplified by our expertise.", shifted: true },
-              { icon: Sparkles, title: "Innovation", desc: "Designs that define the future.", shifted: false },
-              { icon: Award, title: "Excellence", desc: "Award-winning quality, every time.", shifted: true },
-            ].map(({ icon: Icon, title, desc, shifted }) => (
+              { icon: Target, title: "Precision", desc: "Every angle meticulously calculated." },
+              { icon: Users, title: "Collaboration", desc: "Your vision, amplified by our expertise." },
+              { icon: Sparkles, title: "Innovation", desc: "Designs that define the future." },
+              { icon: Award, title: "Excellence", desc: "Award-winning quality, every time." },
+            ].map(({ icon: Icon, title, desc }) => (
               <div
                 key={title}
-                className={`bg-[var(--section)] p-5 sm:p-7 rounded-2xl sm:rounded-3xl border border-[var(--border)] flex flex-col gap-3 shadow-sm hover:shadow-md hover:border-blue-500/30 transition-all duration-300 ${shifted ? "sm:translate-y-6" : ""}`}
+                className="bg-[var(--section)] p-5 sm:p-7 rounded-2xl sm:rounded-3xl border border-[var(--border)] flex flex-col gap-3 shadow-sm hover:shadow-md hover:border-blue-500/30 transition-all duration-300"
               >
                 <div className="h-10 w-10 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                   <Icon className="h-5 w-5 text-blue-500" />
@@ -162,6 +200,7 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
+
         </div>
       </section>
 

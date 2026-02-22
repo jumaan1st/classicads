@@ -219,9 +219,15 @@ export default function ServicesPage() {
                 </div>
                 <div className="px-2 pb-2">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-blue-600 dark:text-blue-400 font-bold text-[10px] sm:text-xs uppercase tracking-widest bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/10 dark:border-blue-500/20">
-                      ₹{s.priceRange.min.toLocaleString()} - {s.priceRange.max.toLocaleString()}
-                    </span>
+                    {s.priceRange?.min ? (
+                      <span className="text-blue-600 dark:text-blue-400 font-bold text-[10px] sm:text-xs uppercase tracking-widest bg-blue-500/10 px-2.5 py-1 rounded-md border border-blue-500/10 dark:border-blue-500/20">
+                        ₹{s.priceRange.min.toLocaleString()} – {s.priceRange.max.toLocaleString()}
+                      </span>
+                    ) : (
+                      <span className="text-[var(--muted)] font-semibold text-[10px] sm:text-xs uppercase tracking-widest bg-[var(--muted-bg)] px-2.5 py-1 rounded-md border border-[var(--border)]">
+                        Contact us for pricing
+                      </span>
+                    )}
                   </div>
                   <h2 className="font-heading text-xl md:text-2xl font-bold text-[var(--foreground)] mb-2 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{s.name}</h2>
                   <p className="line-clamp-2 text-sm text-[var(--muted)] leading-relaxed mb-6">{s.description}</p>

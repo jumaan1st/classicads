@@ -40,21 +40,31 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="bg-[var(--background)] min-h-screen pt-12 md:pt-16 pb-24">
             {/* Article Header */}
             <article className="max-w-4xl mx-auto px-5 sm:px-6">
-                <div className="mb-8">
+                {/* Back link + status on one row */}
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-8">
                     <Link href="/projects" className="inline-flex items-center gap-2 text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
                         <ArrowLeft className="h-4 w-4" /> Back to projects
                     </Link>
-                </div>
-
-                <div className="flex flex-wrap gap-2 mb-6">
-                    {connectedServices.map((s: any) => (
-                        <Link key={s.id} href={`/services/${s.slug}`} className="text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-widest bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
-                            {s.name}
-                        </Link>
-                    ))}
-                    <span className="text-[var(--muted)] font-medium text-xs uppercase tracking-widest bg-[var(--muted-bg)] px-3 py-1.5 rounded-lg border border-[var(--border)]">
-                        {project.status.replace("_", " ")}
-                    </span>
+                    {(() => {
+                        const s = project.status.toLowerCase();
+                        const isActive = s === 'active';
+                        const isDone = s === 'completed';
+                        const isProgress = s.includes('progress');
+                        const dotCls = isActive ? 'bg-emerald-400 animate-pulse'
+                            : isDone ? 'bg-blue-400'
+                                : isProgress ? 'bg-amber-400 animate-pulse'
+                                    : 'bg-gray-400';
+                        const pillCls = isActive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                            : isDone ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                                : isProgress ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                                    : 'bg-[var(--muted-bg)] text-[var(--muted)] border-[var(--border)]';
+                        return (
+                            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold uppercase tracking-widest ${pillCls}`}>
+                                <span className={`h-2 w-2 rounded-full ${dotCls}`} />
+                                {project.status.replace(/_/g, ' ')}
+                            </span>
+                        );
+                    })()}
                 </div>
 
                 <h1 className="font-heading text-4xl sm:text-5xl md:text-6xl font-bold text-[var(--foreground)] leading-tight mb-6">
@@ -80,7 +90,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                         <div className="flex items-center gap-2 text-[var(--muted)] mb-1">
                             <DollarSign className="h-4 w-4" /> <span className="text-sm font-medium">Budget</span>
                         </div>
-                        <div className="font-semibold text-[var(--foreground)]">₹{project.budget.toLocaleString()}</div>
+                        {project.budget ? (
+                            <div className="font-semibold text-[var(--foreground)]">₹{project.budget.toLocaleString()}</div>
+                        ) : (
+                            <Link href="/contact" className="font-semibold text-blue-500 hover:underline text-sm">Contact us</Link>
+                        )}
                     </div>
                     <div>
                         <div className="flex items-center gap-2 text-[var(--muted)] mb-1">
@@ -133,6 +147,26 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     {/* Sidebar / Milestones */}
                     <div className="sticky top-[100px]">
                         <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-sm">
+
+                            {/* Services used */}
+                            {connectedServices.length > 0 && (
+                                <div className="mb-6 pb-6 border-b border-[var(--border)]">
+                                    <h3 className="font-bold text-sm uppercase tracking-widest text-[var(--muted)] mb-3">Services</h3>
+                                    <div className="flex flex-col gap-2">
+                                        {connectedServices.map((s: any) => (
+                                            <Link
+                                                key={s.id}
+                                                href={`/services/${s.slug}`}
+                                                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                            >
+                                                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                                                {s.name}
+                                            </Link>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <h3 className="font-bold text-lg text-[var(--foreground)] mb-6 font-heading">Project Milestones</h3>
                             <div className="space-y-6">
                                 {project.milestones.map((milestone: any, i: number) => (

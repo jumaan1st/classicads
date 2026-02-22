@@ -76,12 +76,19 @@ export default function ServiceDetailPage() {
               {service.name}
             </h1>
             <p className="mt-4 text-[var(--muted)]">{service.description}</p>
-            <p className="mt-4 text-lg font-medium text-[var(--accent)]">
-              ₹{service.priceRange.min.toLocaleString()} – ₹{service.priceRange.max.toLocaleString()}
-            </p>
+            {service.priceRange?.min ? (
+              <p className="mt-4 text-lg font-medium text-[var(--accent)]">
+                ₹{service.priceRange.min.toLocaleString()} – ₹{service.priceRange.max.toLocaleString()}
+              </p>
+            ) : (
+              <Link href="/contact" className="mt-4 inline-flex items-center gap-1.5 text-base font-semibold text-blue-500 hover:underline">
+                Contact us for pricing →
+              </Link>
+            )}
             <p className="mt-1 text-sm text-[var(--muted)]">
               Timeline: {service.timelineWeeks.min}–{service.timelineWeeks.max} weeks
             </p>
+
             <Button href={`/quote?service=${service.slug}`} className="mt-6">
               Get a Quote
             </Button>
