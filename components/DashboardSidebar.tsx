@@ -8,19 +8,12 @@ type Role = "employee" | "admin";
 
 const adminLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/leads", label: "CRM / Leads", icon: Database },
-  { href: "/dashboard/projects", label: "Projects", icon: Briefcase },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
-  { href: "/dashboard/employees", label: "Employees", icon: Users },
   { href: "/dashboard/customers", label: "Customers", icon: UserSquare },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart },
-  { href: "/dashboard/pages", label: "Page content", icon: Settings },
 ];
 
 const employeeLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/leads", label: "Leads", icon: Database },
-  { href: "/dashboard/projects", label: "My Projects", icon: Briefcase },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
 ];
 
@@ -48,7 +41,7 @@ export default function DashboardSidebar({
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 flex flex-col border-r border-[var(--border)] bg-[#111213]/95 backdrop-blur-xl transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 flex flex-col border-r border-[var(--border)] bg-[var(--background)]/95 backdrop-blur-xl transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"
           }`}
       >
         <div className="flex items-center justify-between p-6">
@@ -76,8 +69,8 @@ export default function DashboardSidebar({
                 href={href}
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group ${isActive
-                    ? "bg-blue-500/10 text-blue-400 shadow-sm shadow-blue-500/5 border border-blue-500/20"
-                    : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--foreground)] hover:border-[var(--border)] border border-transparent"
+                  ? "bg-blue-500/10 text-blue-400 shadow-sm shadow-blue-500/5 border border-blue-500/20"
+                  : "text-[var(--muted)] hover:bg-[var(--card)] hover:text-[var(--foreground)] hover:border-[var(--border)] border border-transparent"
                   }`}
               >
                 <Icon className={`h-4 w-4 ${isActive ? "text-blue-400" : "text-[var(--muted)] group-hover:text-[var(--foreground)]"}`} />
@@ -87,7 +80,7 @@ export default function DashboardSidebar({
           })}
         </nav>
 
-        <div className="p-4 border-t border-[var(--border)] bg-[#111213]/80">
+        <div className="p-4 border-t border-[var(--border)] bg-[var(--muted-bg)]/30">
           <Link
             href="/"
             className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-semibold text-[var(--foreground)] hover:bg-[var(--muted-bg)] transition-all"

@@ -19,7 +19,6 @@ export interface Analytics {
   conversionRate: number;
   totalLeads: number;
   wonLeads: number;
-  employeePerformance: { employeeId: string; name: string; projectsCompleted: number; revenue: number }[];
   totalRevenueYTD: number;
   expensesThisMonth: number;
 }
@@ -43,11 +42,6 @@ const DUMMY_ANALYTICS: Analytics = {
   conversionRate: 32,
   totalLeads: 45,
   wonLeads: 14,
-  employeePerformance: [
-    { employeeId: "EMP1", name: "Alex Rivera", projectsCompleted: 24, revenue: 620000 },
-    { employeeId: "EMP2", name: "Sofia Patel", projectsCompleted: 18, revenue: 580000 },
-    { employeeId: "EMP3", name: "David Kim", projectsCompleted: 8, revenue: 195000 },
-  ],
   totalRevenueYTD: 362470,
   expensesThisMonth: 42000,
 };

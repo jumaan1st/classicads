@@ -56,13 +56,13 @@ export default function DashboardCustomersPage() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold text-[var(--foreground)]">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-heading text-3xl font-bold text-[var(--foreground)] tracking-tight">
             Customers
           </h1>
-          <p className="mt-1 text-[var(--muted)]">
+          <p className="text-[var(--muted)] text-sm">
             Store and manage customer details. Admin only.
           </p>
         </div>
@@ -76,93 +76,98 @@ export default function DashboardCustomersPage() {
       </div>
 
       {formOpen && (
-        <Card className="mt-8 p-6">
-          <h2 className="font-heading text-lg font-bold text-[var(--foreground)]">
-            New customer
+        <Card className="p-6 sm:p-8 bg-[var(--card)]/80 backdrop-blur-md border border-[var(--border)] shadow-md">
+          <h2 className="font-heading text-xl font-bold text-[var(--foreground)]">
+            New Customer
           </h2>
-          <form onSubmit={handleSubmit} className="mt-4 grid gap-4 sm:grid-cols-2">
+          <form onSubmit={handleSubmit} className="mt-6 grid gap-5 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-[var(--muted)]">Name *</label>
+              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Name *</label>
               <input
                 required
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--muted-bg)] px-4 py-2 text-[var(--foreground)]"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                placeholder="John Doe"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[var(--muted)]">Email *</label>
+              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Email *</label>
               <input
                 required
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--muted-bg)] px-4 py-2 text-[var(--foreground)]"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                placeholder="john@example.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-[var(--muted)]">Phone</label>
+              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Phone</label>
               <input
                 value={form.phone}
                 onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--muted-bg)] px-4 py-2 text-[var(--foreground)]"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                placeholder="+1 234 567 890"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-[var(--muted)]">Address</label>
+              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Address</label>
               <input
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--muted-bg)] px-4 py-2 text-[var(--foreground)]"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
+                placeholder="123 Main St"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-[var(--muted)]">Notes</label>
+              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Notes</label>
               <textarea
-                rows={2}
+                rows={3}
                 value={form.notes}
                 onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="mt-1 w-full rounded-lg border border-[var(--border)] bg-[var(--muted-bg)] px-4 py-2 text-[var(--foreground)]"
+                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all resize-none"
+                placeholder="Any additional details..."
               />
             </div>
-            <div>
+            <div className="pt-2">
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-lg bg-[var(--button)] px-4 py-2 text-sm font-semibold text-[var(--button-text)] hover:bg-[var(--button-hover)] disabled:opacity-50"
+                className="rounded-xl bg-[var(--foreground)] px-6 py-3 text-sm font-bold text-[var(--background)] hover:opacity-90 disabled:opacity-50 transition-all shadow-md"
               >
-                {saving ? "Saving…" : "Save customer"}
+                {saving ? "Saving…" : "Save Customer"}
               </button>
             </div>
           </form>
         </Card>
       )}
 
-      <Card className="mt-8 overflow-hidden">
+      <Card className="overflow-hidden bg-[var(--card)]/90 backdrop-blur-xl border border-[var(--border)] shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-[var(--border)] text-[var(--muted)]">
-                <th className="p-4 font-medium">Name</th>
-                <th className="p-4 font-medium">Email</th>
-                <th className="p-4 font-medium">Phone</th>
-                <th className="p-4 font-medium">Address</th>
-                <th className="p-4 font-medium">Notes</th>
-                <th className="p-4 font-medium">Added</th>
+              <tr className="border-b border-[var(--border)] bg-[var(--muted-bg)]/50 text-[var(--muted)] text-xs uppercase tracking-wider font-semibold">
+                <th className="p-4 sm:px-6">Name</th>
+                <th className="p-4 sm:px-6">Email</th>
+                <th className="p-4 sm:px-6">Phone</th>
+                <th className="p-4 sm:px-6">Address</th>
+                <th className="p-4 sm:px-6 hidden md:table-cell">Notes</th>
+                <th className="p-4 sm:px-6">Added</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[var(--border)]">
               {customers.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-b border-[var(--border)] hover:bg-[var(--muted-bg)]/30"
+                  className="hover:bg-blue-500/5 transition-colors group"
                 >
-                  <td className="p-4 font-medium text-[var(--foreground)]">{c.name}</td>
-                  <td className="p-4 text-[var(--muted)]">{c.email}</td>
-                  <td className="p-4 text-[var(--muted)]">{c.phone || "—"}</td>
-                  <td className="p-4 text-[var(--muted)]">{c.address || "—"}</td>
-                  <td className="p-4 text-[var(--muted)] max-w-xs truncate">{c.notes || "—"}</td>
-                  <td className="p-4 text-[var(--muted)]">
+                  <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">{c.name}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.email}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.phone || "—"}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.address || "—"}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)] max-w-xs truncate hidden md:table-cell">{c.notes || "—"}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)] text-xs font-medium tracking-wider uppercase">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </td>
                 </tr>

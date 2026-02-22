@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Plus, Eye } from "lucide-react";
 import Card from "@/components/Card";
 
 type Invoice = {
@@ -43,45 +45,78 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div>
-      <h1 className="font-heading text-2xl font-semibold text-[var(--foreground)]">
-        Invoices
-      </h1>
-      <p className="mt-1 text-[var(--muted)]">Data from /api/invoices</p>
-      <Card className="mt-8 overflow-hidden">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col gap-2">
+          <h1 className="font-heading text-3xl font-bold text-[var(--foreground)] tracking-tight">
+            Invoices
+          </h1>
+          <p className="text-[var(--muted)] text-sm">Track billing, overdue payments, and revenue collection.</p>
+        </div>
+        <Link
+          href="/dashboard/invoices/new"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--foreground)] text-[var(--background)] font-bold rounded-xl hover:bg-[var(--accent)] hover:text-white transition-all duration-300 shadow-sm"
+        >
+          <Plus className="w-5 h-5" />
+          Create Invoice
+        </Link>
+      </div>
+
+      <Card className="overflow-hidden bg-[var(--card)]/90 backdrop-blur-xl border border-[var(--border)] shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-[var(--border)] text-[var(--muted)]">
-                <th className="p-4 font-medium">Invoice</th>
-                <th className="p-4 font-medium">Project</th>
-                <th className="p-4 font-medium">Client</th>
-                <th className="p-4 font-medium">Due</th>
-                <th className="p-4 font-medium">Status</th>
-                <th className="p-4 font-medium">Total</th>
+              <tr className="border-b border-[var(--border)] bg-[var(--muted-bg)]/50 text-[var(--muted)] text-xs uppercase tracking-wider font-semibold">
+                <th className="p-4 sm:px-6">Invoice</th>
+                <th className="p-4 sm:px-6">Project</th>
+                <th className="p-4 sm:px-6">Client</th>
+                <th className="p-4 sm:px-6">Due</th>
+                <th className="p-4 sm:px-6">Status</th>
+                <th className="p-4 sm:px-6">Total</th>
+                <th className="p-4 sm:px-6 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[var(--border)]">
               {invoices.map((inv) => (
-                <tr key={inv.id} className="border-b border-[var(--border)] hover:bg-[var(--muted-bg)]/30">
-                  <td className="p-4 font-medium text-[var(--foreground)]">{inv.invoiceNumber}</td>
-                  <td className="p-4 text-[var(--muted)]">{inv.projectTitle}</td>
-                  <td className="p-4 text-[var(--muted)]">{inv.clientName}</td>
-                  <td className="p-4 text-[var(--muted)]">{inv.dueDate}</td>
-                  <td className="p-4">
+                <tr key={inv.id} className="hover:bg-blue-500/5 transition-colors group">
+                  <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">
+                    <span className="text-[var(--muted)] text-xs mr-1">#</span>{inv.invoiceNumber}
+                  </td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.projectTitle}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.clientName}</td>
+                  <td className="p-4 sm:px-6 text-[var(--muted)] font-medium">
+                    {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </td>
+                  <td className="p-4 sm:px-6">
                     <span
-                      className={`rounded-full px-2 py-1 text-xs font-medium ${
-                        statusColors[inv.status] ?? "bg-[var(--muted-bg)] text-[var(--muted)]"
-                      }`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold tracking-widest uppercase border ${statusColors[inv.status]
+                        ? statusColors[inv.status].replace("text-", "text-").replace("bg-", "bg-opacity-10 border-").concat(" border-opacity-20 bg-[var(--accent)]/10 text-[var(--foreground)]")
+                        : "bg-[var(--muted-bg)] text-[var(--muted)] border-[var(--border)]"
+                        }`}
                     >
                       {inv.status}
                     </span>
                   </td>
-                  <td className="p-4 font-medium text-[var(--accent)]">
-                    {inv.currency} {inv.total.toLocaleString()}
+                  <td className="p-4 sm:px-6 font-bold text-[var(--foreground)] tracking-tight">
+                    <span className="text-[var(--muted)] font-medium text-xs mr-1">{inv.currency}</span>
+                    {inv.total.toLocaleString()}
+                  </td>
+                  <td className="p-4 sm:px-6 text-right">
+                    <Link
+                      href={`/dashboard/invoices/${inv.id}`}
+                      className="inline-flex items-center justify-center p-2 rounded-lg bg-[var(--muted-bg)] text-[var(--foreground)] hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
+                      title="View Invoice"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Link>
                   </td>
                 </tr>
               ))}
+              {invoices.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-[var(--muted)]">No invoices found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
