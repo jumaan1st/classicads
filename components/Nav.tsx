@@ -72,7 +72,7 @@ export default function Nav() {
     >
       <div
         ref={topRowRef}
-        className="bg-[var(--background)] relative z-20 border-b border-[var(--nav-border)]"
+        className="bg-[var(--background)] relative z-20 border-b border-[var(--border)]"
         style={{ boxShadow: "var(--shadow)" }}
       >
         {/* TOP ROW (Logo, Contact Button, Controls) */}
@@ -83,7 +83,7 @@ export default function Nav() {
               href="/"
               className="flex items-center font-heading font-bold tracking-tight text-[var(--foreground)] transition-smooth"
             >
-              <span className="text-xl md:text-2xl mt-0.5">Classic<span className="text-[var(--muted)]">Ads</span></span>
+              <span className="text-xl md:text-2xl mt-0.5">Classic<span className="text-blue-600 dark:text-blue-500">Ads</span></span>
             </Link>
 
             {/* DESKTOP NAV (Text + Icons) - xl and up */}
@@ -95,8 +95,8 @@ export default function Nav() {
                     <Link
                       href={href}
                       className={`flex items-center gap-2 rounded-xl px-3 py-2 text-[15px] font-medium transition-smooth ${isActive
-                        ? "text-[var(--foreground)]"
-                        : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                        ? "text-blue-600 dark:text-blue-500 font-semibold"
+                        : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
                         }`}
                     >
                       <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2 : 1.5} />
@@ -124,13 +124,13 @@ export default function Nav() {
             <div className="hidden md:flex items-center gap-2 xl:gap-3">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 rounded-xl px-2 xl:px-4 py-2 text-[14px] xl:text-[15px] font-medium text-[var(--muted)] transition-smooth hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                className="flex items-center gap-2 rounded-xl px-2 xl:px-4 py-2 text-[14px] xl:text-[15px] font-medium text-[var(--muted)] transition-smooth hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
               >
                 Dashboard
               </Link>
               <Link
                 href="/login"
-                className="flex items-center gap-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] px-5 py-2.5 text-[15px] font-semibold transition-smooth shadow-sm hover:opacity-90"
+                className="flex items-center gap-2 rounded-xl bg-blue-600 text-white px-5 py-2.5 text-[15px] font-semibold transition-smooth shadow-sm hover:bg-blue-700"
               >
                 Login
               </Link>
@@ -151,7 +151,7 @@ export default function Nav() {
       </div>
 
       {/* TABLET NAV ROW (Icons only with light background - shown on md to lg) */}
-      <div className="hidden md:block xl:hidden bg-[var(--background)] border-b border-[var(--nav-border)]">
+      <div className="hidden md:block xl:hidden bg-[var(--background)] border-b border-[var(--border)]">
         <ul className="flex items-center justify-center gap-4 xl:gap-6 max-w-[1400px] mx-auto px-4 py-2.5">
           {mainNavLinks.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
@@ -160,8 +160,8 @@ export default function Nav() {
                 <Link
                   href={href}
                   className={`flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-medium transition-smooth ${isActive
-                    ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
-                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                    ? "bg-blue-50/50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-200 dark:border-blue-500/30"
+                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
                     }`}
                 >
                   <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2 : 1.5} />
@@ -174,7 +174,7 @@ export default function Nav() {
       </div>
 
       {/* MOBILE NAV (Icons only - Two layer style, shown only on < md) */}
-      <div className="md:hidden bg-[var(--background)] border-b border-[var(--nav-border)] px-2 py-3 relative z-10 shadow-sm transition-smooth mt-px">
+      <div className="md:hidden bg-[var(--background)] border-b border-[var(--border)] px-2 py-3 relative z-10 shadow-sm transition-smooth mt-px">
         <ul className="flex items-center justify-around max-w-sm mx-auto">
           {mainNavLinks.map(({ href, label, icon: Icon }) => {
             const isActive = pathname === href;
@@ -184,8 +184,8 @@ export default function Nav() {
                   href={href}
                   aria-label={label}
                   className={`flex items-center justify-center p-2.5 rounded-[14px] transition-smooth ${isActive
-                    ? "bg-[var(--muted-bg)] text-[var(--foreground)] border border-[var(--border)]"
-                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]"
+                    ? "bg-blue-50/50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 border border-blue-200 dark:border-blue-500/30"
+                    : "text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
                     }`}
                 >
                   <Icon className="h-5 w-5" strokeWidth={isActive ? 2 : 1.5} />
@@ -202,7 +202,7 @@ export default function Nav() {
           <div className="md:hidden fixed inset-0 z-30 bg-black/5 dark:bg-black/20 backdrop-blur-sm" onClick={() => setOpen(false)} aria-hidden="true" />
 
           <div
-            className="md:hidden absolute left-0 right-0 top-[100%] bg-[var(--background)] border-b border-[var(--nav-border)] shadow-md z-40 flex flex-col px-5 py-6 gap-2"
+            className="md:hidden absolute left-0 right-0 top-[100%] bg-[var(--background)] border-b border-[var(--border)] shadow-md z-40 flex flex-col px-5 py-6 gap-2"
           >
             <div className="mb-2 px-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] flex justify-between items-center">
               Account

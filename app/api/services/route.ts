@@ -112,6 +112,38 @@ const DUMMY_SERVICES: Service[] = [
     materials: ["Mood boards", "Sample swatches", "3D renders (optional)"],
     featured: false,
   },
+  {
+    id: "7",
+    name: "Bathroom Remodeling",
+    slug: "bathroom-remodeling",
+    category: "interior",
+    description: "Spa-like bathroom renovations including custom vanity, walk-in showers, and premium tiling.",
+    priceRange: { min: 25000, max: 80000 },
+    timelineWeeks: { min: 3, max: 8 },
+    image: "https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800",
+    gallery: [
+      "https://images.unsplash.com/photo-1620626011761-996317b8d101?w=600",
+      "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=600",
+    ],
+    materials: ["Porcelain tiles", "Glass enclosures", "Rain showers", "Floating vanities"],
+    featured: false,
+  },
+  {
+    id: "8",
+    name: "Commercial Office Design",
+    slug: "commercial-design",
+    category: "interior",
+    description: "Productivity-focused workspace layouts combining ergonomic furniture with corporate branding.",
+    priceRange: { min: 100000, max: 500000 },
+    timelineWeeks: { min: 6, max: 20 },
+    image: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800",
+    gallery: [
+      "https://images.unsplash.com/photo-1497366216548-37526070297c?w=600",
+      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?w=600",
+    ],
+    materials: ["Acoustic panels", "Ergonomic seating", "Glass partitions", "Commercial carpet"],
+    featured: true,
+  },
 ];
 
 export async function GET(request: Request) {
@@ -119,6 +151,9 @@ export async function GET(request: Request) {
   const category = searchParams.get("category");
   const featured = searchParams.get("featured");
   const slug = searchParams.get("slug");
+
+  const page = parseInt(searchParams.get("page") ?? "1", 10);
+  const limit = parseInt(searchParams.get("limit") ?? "6", 10);
 
   if (slug) {
     const service = DUMMY_SERVICES.find((s) => s.slug === slug);
@@ -130,5 +165,16 @@ export async function GET(request: Request) {
   if (category) data = data.filter((s) => s.category === category);
   if (featured === "true") data = data.filter((s) => s.featured);
 
-  return NextResponse.json({ services: data });
+  const total = data.length;
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const paginatedData = data.slice(startIndex, endIndex);
+
+  return NextResponse.json({
+    services: paginatedData,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit)
+  });
 }

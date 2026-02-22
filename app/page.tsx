@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import { getPageContent, getFeaturedServices, getFeaturedProjects } from "@/app/lib/data";
+import MapEmbed from "@/components/MapEmbed";
 
 export default async function Home() {
   const [pageContent, services, projects] = await Promise.all([
@@ -16,12 +17,12 @@ export default async function Home() {
   return (
     <div className="bg-[var(--background)] selection:bg-blue-500/30">
       {/* 1. HERO SECTION */}
-      <section className="relative min-h-[90vh] flex items-center justify-center overflow-hidden border-b border-[var(--border)]">
+      <section className="relative min-h-[75vh] sm:min-h-[85vh] flex items-center justify-center overflow-hidden border-b border-[var(--border)]">
         {/* Decorative UI Patterns */}
         <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-0 h-[300px] w-[300px] md:h-[600px] md:w-[600px] rounded-full bg-blue-500/10 blur-[150px]" />
 
-        <div className="relative z-10 px-4 sm:px-5 text-center max-w-5xl mx-auto flex flex-col items-center pt-28 pb-16 md:pt-32 md:pb-20">
+        <div className="relative z-10 px-4 sm:px-5 text-center max-w-5xl mx-auto flex flex-col items-center pt-12 pb-16 sm:pt-16 md:pt-24 md:pb-20">
           <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full border border-[var(--border)] bg-[var(--background)] shadow-sm mb-6 sm:mb-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 max-w-full">
             <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500 flex-shrink-0" />
             <span className="text-xs sm:text-sm font-medium text-[var(--foreground)] truncate">Premium Layouts & Architectural Design</span>
@@ -144,16 +145,15 @@ export default async function Home() {
               <Image src={p.image} fill className="object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-90" alt={p.title} />
 
               {/* Always show a slight gradient at the bottom for readability */}
-              <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
               {/* Hover overlay for a sleek website builder interactive feel */}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]" />
 
               <div className="absolute inset-x-0 bottom-0 p-8 sm:p-10 flex flex-col justify-end translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-blue-400 font-bold text-xs uppercase tracking-widest">{p.serviceName}</span>
-                  <span className="h-1 w-1 rounded-full bg-white/50" />
-                  <span className="text-white/80 font-medium text-xs uppercase tracking-widest">{p.clientName}</span>
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-blue-400 font-bold text-[10px] sm:text-[11px] uppercase tracking-widest bg-blue-500/10 px-2.5 py-1 rounded backdrop-blur-md border border-blue-500/20">Featured Project</span>
+                  <span className="text-white/80 font-medium text-[10px] sm:text-[11px] uppercase tracking-widest bg-white/10 px-2.5 py-1 rounded backdrop-blur-md border border-white/10">{p.clientName}</span>
                 </div>
                 <h3 className="font-heading text-2xl md:text-3xl font-bold text-white leading-tight">{p.title}</h3>
 
@@ -167,24 +167,34 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 5. CALL TO ACTION */}
+      {/* 5. CALL TO ACTION & LOCATION */}
       <section className="py-24 px-5">
-        <div className="max-w-6xl mx-auto relative rounded-[2rem] sm:rounded-[3rem] overflow-hidden bg-[var(--section)] border border-[var(--border)] p-12 md:p-24 text-center shadow-2xl">
+        <div className="max-w-7xl mx-auto relative rounded-[2rem] sm:rounded-[3rem] overflow-hidden bg-[var(--section)] border border-[var(--border)] p-8 md:p-16 lg:p-24 shadow-2xl">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent pointer-events-none" />
 
-          <h2 className="relative z-10 font-heading text-4xl md:text-5xl lg:text-7xl font-bold text-[var(--foreground)] mb-6 tracking-tight">
-            Stop Settling.<br />Start Creating.
-          </h2>
-          <p className="relative z-10 text-lg md:text-xl text-[var(--muted)] max-w-2xl mx-auto mb-12">
-            Book a free consultation today and let our design experts craft exactly what you need. A full-service construction and design agency.
-          </p>
-          <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/contact" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-2xl font-semibold text-lg transition-smooth shadow-xl shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98]">
-              Contact Us Now
-            </Link>
-            <Link href="/projects" className="w-full sm:w-auto bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--muted-bg)] text-[var(--foreground)] px-10 py-5 rounded-2xl font-semibold text-lg transition-smooth shadow-sm">
-              View Portfolio
-            </Link>
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left: CTA Text & Buttons */}
+            <div className="relative z-10 text-center lg:text-left">
+              <h2 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-[var(--foreground)] mb-6 tracking-tight">
+                Stop Settling.<br />Start Creating.
+              </h2>
+              <p className="text-lg md:text-xl text-[var(--muted)] max-w-xl mx-auto lg:mx-0 mb-10">
+                Book a free consultation today and let our design experts craft exactly what you need. A full-service construction and design agency.
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                <Link href="/contact" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-[14px] font-semibold text-base transition-smooth shadow-lg shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98]">
+                  Contact Us Now
+                </Link>
+                <Link href="/projects" className="w-full sm:w-auto bg-[var(--background)] border border-[var(--border)] hover:bg-[var(--muted-bg)] text-[var(--foreground)] px-8 py-3.5 rounded-[14px] font-semibold text-base transition-smooth shadow-sm">
+                  View Portfolio
+                </Link>
+              </div>
+            </div>
+
+            {/* Right: Map Embed */}
+            <div className="relative z-10 w-full aspect-square md:aspect-video lg:aspect-square max-h-[500px]">
+              <MapEmbed />
+            </div>
           </div>
         </div>
       </section>

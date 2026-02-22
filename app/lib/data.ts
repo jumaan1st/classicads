@@ -31,18 +31,19 @@ export async function getFeaturedServices(): Promise<
 const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=800";
 
 export async function getFeaturedProjects(): Promise<
-  { id: string; title: string; clientName: string; serviceName: string; status: string; image: string }[]
+  { id: string; title: string; clientName: string; serviceIds: string[]; status: string; image: string; content: string }[]
 > {
   try {
-    const res = await fetch(`${getBaseUrl()}/api/projects`, { cache: "no-store" });
+    const res = await fetch(`${getBaseUrl()}/api/projects`, { cache: "no-store", next: { revalidate: 0 } });
     const json = await res.json();
     const projects = json.projects ?? [];
-    return projects.map((p: { id: string; title: string; clientName: string; serviceName: string; status: string; progressPhotos?: { url: string }[] }) => ({
+    return projects.map((p: { id: string; title: string; clientName: string; serviceIds: string[]; status: string; progressPhotos?: { url: string }[]; content: string }) => ({
       id: p.id,
       title: p.title,
       clientName: p.clientName,
-      serviceName: p.serviceName,
+      serviceIds: p.serviceIds ?? [],
       status: p.status,
+      content: p.content ?? "",
       image: p.progressPhotos?.[0]?.url ?? DEFAULT_PROJECT_IMAGE,
     }));
   } catch {
