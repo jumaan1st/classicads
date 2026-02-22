@@ -44,6 +44,7 @@ export default function ServicesPage() {
 
   const filterRef = useRef<HTMLDivElement>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+  const mobileSheetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/pages?slug=services")
@@ -237,17 +238,22 @@ export default function ServicesPage() {
         )}
       </div>
 
-      {/* Mobile bottom sheet — wrapper IS the backdrop */}
+      {/* Mobile bottom sheet — z-[9999] sits above everything */}
       {filterOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60"
-          onClick={() => setFilterOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/60"
+          style={{ zIndex: 9999 }}
+          onClick={(e) => {
+            if (mobileSheetRef.current && !mobileSheetRef.current.contains(e.target as Node)) {
+              setFilterOpen(false);
+            }
+          }}
         >
           <div
+            ref={mobileSheetRef}
             className="absolute bottom-0 left-0 right-0 bg-[var(--card)] rounded-t-[2rem] max-h-[88vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-center pt-3 pb-0 flex-shrink-0">
+            <div className="flex justify-center pt-3 flex-shrink-0">
               <div className="h-1.5 w-12 rounded-full bg-[var(--border)]" />
             </div>
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
@@ -255,10 +261,10 @@ export default function ServicesPage() {
               <button
                 type="button"
                 onClick={() => setFilterOpen(false)}
-                className="h-10 w-10 rounded-full bg-[var(--foreground)] flex items-center justify-center shadow-md active:scale-95 transition-transform"
-                aria-label="Close filter"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-bold shadow transition-opacity hover:opacity-80 active:opacity-70"
               >
-                <X className="h-5 w-5 text-[var(--background)]" />
+                <X className="h-4 w-4" />
+                Close
               </button>
             </div>
             <div className="overflow-y-auto flex-1">

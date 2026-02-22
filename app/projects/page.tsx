@@ -38,7 +38,9 @@ export default function ProjectsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
-  const filterRef = useRef<HTMLDivElement>(null);
+  // Refs for click-outside detection
+  const filterBtnRef = useRef<HTMLDivElement>(null);   // toolbar filter button + desktop popover
+  const mobileSheetRef = useRef<HTMLDivElement>(null);  // mobile sheet panel
   const sortRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,11 +55,11 @@ export default function ProjectsPage() {
     }).finally(() => setLoading(false));
   }, []);
 
-  // Only close filter popover on DESKTOP — mobile sheet has its own close buttons
   useEffect(() => {
     const down = (e: MouseEvent) => {
-      const isMobile = window.innerWidth < 768;
-      if (!isMobile && filterRef.current && !filterRef.current.contains(e.target as Node)) {
+      const isDesktop = window.innerWidth >= 768;
+      // Desktop: close filter popover when clicking outside button+popover
+      if (isDesktop && filterBtnRef.current && !filterBtnRef.current.contains(e.target as Node)) {
         setFilterOpen(false);
       }
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
@@ -68,7 +70,6 @@ export default function ProjectsPage() {
     return () => document.removeEventListener("mousedown", down);
   }, []);
 
-  // Lock body scroll when mobile filter is open
   useEffect(() => {
     document.body.style.overflow = filterOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
@@ -112,7 +113,7 @@ export default function ProjectsPage() {
           <p className="mt-2 text-sm sm:text-base text-[var(--muted)]">Browse our portfolio of completed and active design projects.</p>
         </div>
 
-        {/* Toolbar */}
+        {/* ── Toolbar ── */}
         <div className="flex items-center gap-2 sm:gap-3 mb-6">
           {/* Search */}
           <div className="relative flex-1">
@@ -129,13 +130,13 @@ export default function ProjectsPage() {
             )}
           </div>
 
-          {/* Filter */}
-          <div className="relative" ref={filterRef}>
+          {/* Filter button + desktop popover */}
+          <div className="relative" ref={filterBtnRef}>
             <button
               onClick={() => setFilterOpen(v => !v)}
               className={`relative h-10 inline-flex items-center gap-2 px-4 rounded-xl border font-semibold text-sm transition-all ${activeFilterCount > 0
-                ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
+                  ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
                 }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -145,9 +146,9 @@ export default function ProjectsPage() {
               )}
             </button>
 
-            {/* Desktop popover only */}
+            {/* Desktop popover — below button, scrollable */}
             {filterOpen && (
-              <div className="hidden md:block absolute left-0 top-[calc(100%+8px)] z-50 w-96 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl shadow-black/10">
+              <div className="hidden md:flex absolute left-0 top-[calc(100%+8px)] z-50 w-96 flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl shadow-black/10 max-h-[80vh] overflow-y-auto">
                 <ProjectFilterContent
                   servicesMap={servicesMap} services={services} toggleService={toggleService}
                   dateFrom={dateFrom} setDateFrom={setDateFrom}
@@ -200,7 +201,7 @@ export default function ProjectsPage() {
         ) : displayed.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <p className="text-2xl font-heading font-bold text-[var(--foreground)] mb-2">No projects found</p>
-            <p className="text-[var(--muted)] text-sm">Try adjusting your search or filters.</p>
+            <p className="text-[var(--muted)] text-sm">Try adjusting your filters.</p>
           </div>
         ) : (
           <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
@@ -230,36 +231,42 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      {/* Mobile bottom sheet — wrapper IS the backdrop */}
+      {/* ─── Mobile bottom sheet (z-[9999] so it sits above everything) ─── */}
       {filterOpen && (
         <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60"
-          onClick={() => setFilterOpen(false)}
+          className="md:hidden fixed inset-0 bg-black/60"
+          style={{ zIndex: 9999 }}
+          onClick={(e) => {
+            // Close only when tapping the dark backdrop, not the sheet itself
+            if (mobileSheetRef.current && !mobileSheetRef.current.contains(e.target as Node)) {
+              setFilterOpen(false);
+            }
+          }}
         >
-          {/* Sheet stops propagation so taps inside don't reach the backdrop */}
           <div
+            ref={mobileSheetRef}
             className="absolute bottom-0 left-0 right-0 bg-[var(--card)] rounded-t-[2rem] max-h-[88vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Drag handle */}
-            <div className="flex justify-center pt-3 pb-0 flex-shrink-0">
+            <div className="flex justify-center pt-3 flex-shrink-0">
               <div className="h-1.5 w-12 rounded-full bg-[var(--border)]" />
             </div>
 
-            {/* Header with prominent close button */}
+            {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
               <h2 className="font-heading text-xl font-bold text-[var(--foreground)]">Filter</h2>
+              {/* Large, fully visible close button */}
               <button
                 type="button"
                 onClick={() => setFilterOpen(false)}
-                className="h-10 w-10 rounded-full bg-[var(--foreground)] flex items-center justify-center shadow-md active:scale-95 transition-transform"
-                aria-label="Close filter"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-bold shadow transition-opacity hover:opacity-80 active:opacity-70"
               >
-                <X className="h-5 w-5 text-[var(--background)]" />
+                <X className="h-4 w-4" />
+                Close
               </button>
             </div>
 
-            {/* Scrollable content */}
+            {/* Scrollable filter content */}
             <div className="overflow-y-auto flex-1">
               <ProjectFilterContent
                 servicesMap={servicesMap} services={services} toggleService={toggleService}
@@ -272,12 +279,11 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-/* ── Stable filter panel — defined at module level so it never remounts ── */
+/* ── Filter panel — defined at module level, never remounts ── */
 function ProjectFilterContent({
   servicesMap, services, toggleService,
   dateFrom, setDateFrom, dateTo, setDateTo,
@@ -294,16 +300,13 @@ function ProjectFilterContent({
   onDone: () => void;
 }) {
   return (
-    <div className="p-5 flex flex-col gap-5">
-      {/* SERVICE multi-select */}
+    <div className="p-5 flex flex-col gap-6">
+      {/* Service chips */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)]">Service</p>
           {services.length > 0 && (
-            <button
-              onClick={() => { services.forEach(id => toggleService(id)); }}
-              className="text-xs text-red-400 hover:text-red-500 flex items-center gap-0.5"
-            >
+            <button onClick={clearFilters} className="text-xs text-red-400 hover:text-red-500 flex items-center gap-0.5">
               <X className="h-3 w-3" /> Clear
             </button>
           )}
@@ -313,22 +316,22 @@ function ProjectFilterContent({
             const active = services.includes(id);
             return (
               <button key={id} type="button" onClick={() => toggleService(id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border transition-all ${active
-                  ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
-                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
+                className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${active
+                    ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
                   }`}>
-                {active && <Check className="h-3.5 w-3.5 flex-shrink-0" />}
+                {active && <Check className="h-3.5 w-3.5" />}
                 {name}
               </button>
             );
           })}
         </div>
-        {services.length === 0 && <p className="text-xs text-[var(--muted)] mt-2 opacity-60">Pick one or more to filter</p>}
+        {services.length === 0 && <p className="text-xs text-[var(--muted)] mt-2 opacity-60">Pick one or more</p>}
       </div>
 
       <div className="h-px bg-[var(--border)]" />
 
-      {/* DATE RANGE */}
+      {/* Date range — native inputs, full width */}
       <div>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)]">Date Range</p>
@@ -339,7 +342,7 @@ function ProjectFilterContent({
             </button>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold text-[var(--muted)]">From</label>
             <input
@@ -347,7 +350,8 @@ function ProjectFilterContent({
               value={dateFrom}
               max={dateTo || undefined}
               onChange={e => setDateFrom(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all [color-scheme:light] dark:[color-scheme:dark]"
+              style={{ fontSize: 16 }}
+              className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
             />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -357,7 +361,8 @@ function ProjectFilterContent({
               value={dateTo}
               min={dateFrom || undefined}
               onChange={e => setDateTo(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-3 text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all [color-scheme:light] dark:[color-scheme:dark]"
+              style={{ fontSize: 16 }}
+              className="h-12 w-full rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 text-sm font-medium text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
             />
           </div>
         </div>
@@ -369,11 +374,11 @@ function ProjectFilterContent({
       {/* Footer */}
       <div className="flex items-center gap-3">
         <button type="button" onClick={clearFilters}
-          className="flex-1 h-11 rounded-xl border-2 border-[var(--border)] text-sm font-semibold text-[var(--foreground)] hover:border-[var(--foreground)] transition-all">
+          className="flex-1 h-12 rounded-xl border-2 border-[var(--border)] text-sm font-semibold text-[var(--foreground)] hover:border-[var(--foreground)] transition-all">
           Clear {activeFilterCount > 0 ? `(${activeFilterCount})` : "all"}
         </button>
         <button type="button" onClick={onDone}
-          className="flex-1 h-11 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-semibold hover:opacity-90 transition-all">
+          className="flex-1 h-12 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-semibold hover:opacity-90 transition-all">
           Show {resultCount} results
         </button>
       </div>
