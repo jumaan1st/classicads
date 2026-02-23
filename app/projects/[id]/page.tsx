@@ -123,9 +123,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <div className="grid md:grid-cols-[1fr_300px] gap-12 md:gap-16 items-start">
                     <div className="prose prose-lg dark:prose-invert prose-headings:font-heading prose-a:text-blue-600 dark:prose-a:text-blue-400 max-w-none">
                         <h2 className="text-2xl font-bold mb-4">The Challenge & Solution</h2>
-                        {project.content.split('\\n\\n').map((paragraph: string, i: number) => (
-                            <p key={i} className="text-[var(--muted)] leading-relaxed mb-6">{paragraph}</p>
-                        ))}
+                        {project.content
+                            .replace(/\\n\\n/g, '\n\n')
+                            .split(/\n\n+/)
+                            .filter((p: string) => p.trim())
+                            .map((paragraph: string, i: number) => (
+                                <p key={i} className="text-[var(--muted)] leading-relaxed mb-6">{paragraph.trim()}</p>
+                            ))}
 
                         {project.progressPhotos && project.progressPhotos.length > 1 && (
                             <div className="mt-12">
@@ -187,7 +191,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                                                 {milestone.title}
                                             </span>
                                             <span className="text-xs font-medium text-[var(--muted)] mt-1">
-                                                {milestone.completed ? `Completed ${milestone.completedAt}` : `Due ${milestone.dueDate}`}
+                                                {milestone.completed
+                                                    ? milestone.completedAt ? `Completed ${milestone.completedAt}` : 'Completed'
+                                                    : `Due ${milestone.dueDate}`}
                                             </span>
                                         </div>
                                     </div>
