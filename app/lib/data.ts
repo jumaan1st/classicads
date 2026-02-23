@@ -1,3 +1,5 @@
+import { DUMMY_PROJECTS } from "@/app/api/projects/route";
+
 function getBaseUrl(): string {
   return (
     process.env.NEXT_PUBLIC_APP_URL ||
@@ -33,20 +35,15 @@ const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1618221195710-d
 export async function getFeaturedProjects(): Promise<
   { id: string; title: string; clientName: string; serviceIds: string[]; status: string; image: string; content: string }[]
 > {
-  try {
-    const res = await fetch(`${getBaseUrl()}/api/projects`, { cache: "no-store", next: { revalidate: 0 } });
-    const json = await res.json();
-    const projects = json.projects ?? [];
-    return projects.map((p: { id: string; title: string; clientName: string; serviceIds: string[]; status: string; progressPhotos?: { url: string }[]; content: string }) => ({
-      id: p.id,
-      title: p.title,
-      clientName: p.clientName,
-      serviceIds: p.serviceIds ?? [],
-      status: p.status,
-      content: p.content ?? "",
-      image: p.progressPhotos?.[0]?.url ?? DEFAULT_PROJECT_IMAGE,
-    }));
-  } catch {
-    return [];
-  }
+  // Read directly from the in-process data — avoids unreliable HTTP self-fetches on Vercel
+  // where VERCEL_URL points to the deployment URL, not the production alias.
+  return DUMMY_PROJECTS.map((p) => ({
+    id: p.id,
+    title: p.title,
+    clientName: p.clientName,
+    serviceIds: p.serviceIds ?? [],
+    status: p.status,
+    content: p.content ?? "",
+    image: p.progressPhotos?.[0]?.url ?? DEFAULT_PROJECT_IMAGE,
+  }));
 }

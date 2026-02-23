@@ -58,11 +58,13 @@ export default function ProjectsPage() {
   useEffect(() => {
     const down = (e: MouseEvent) => {
       const isDesktop = window.innerWidth >= 768;
-      // Desktop: close filter popover when clicking outside button+popover
+      // Desktop only: close filter popover when clicking outside button+popover.
+      // On mobile the bottom sheet has its own backdrop — don't interfere with touch events.
       if (isDesktop && filterBtnRef.current && !filterBtnRef.current.contains(e.target as Node)) {
         setFilterOpen(false);
       }
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
+      // Sort dropdown: only close on desktop too, to avoid touch race condition
+      if (isDesktop && sortRef.current && !sortRef.current.contains(e.target as Node)) {
         setSortOpen(false);
       }
     };
@@ -135,8 +137,8 @@ export default function ProjectsPage() {
             <button
               onClick={() => setFilterOpen(v => !v)}
               className={`relative h-10 inline-flex items-center gap-2 px-4 rounded-xl border font-semibold text-sm transition-all ${activeFilterCount > 0
-                  ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                  : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
+                ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
                 }`}
             >
               <SlidersHorizontal className="h-4 w-4" />
@@ -317,8 +319,8 @@ function ProjectFilterContent({
             return (
               <button key={id} type="button" onClick={() => toggleService(id)}
                 className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${active
-                    ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
-                    : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
+                  ? "bg-[var(--foreground)] text-[var(--background)] border-[var(--foreground)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--foreground)] hover:text-[var(--foreground)]"
                   }`}>
                 {active && <Check className="h-3.5 w-3.5" />}
                 {name}

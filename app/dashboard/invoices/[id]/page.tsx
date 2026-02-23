@@ -50,33 +50,36 @@ export default function ViewInvoicePage() {
     const [contentHeight, setContentHeight] = useState(1200);
     const [isFullScreen, setIsFullScreen] = useState(false);
 
+    // Use ResizeObserver to keep scale and height in sync whenever the container or document changes
     useEffect(() => {
-        const updateScale = () => {
-            if (scrollContainerRef.current) {
-                const containerWidth = scrollContainerRef.current.clientWidth;
-                // Leave 32px padding total on mobile, 64px on larger screens
-                const padding = window.innerWidth < 640 ? 32 : 64;
-                const availableWidth = containerWidth - padding;
-                // Calculate scale to exactly fit the available width. Cap it at 1 for desktop so it doesn't get huge.
-                const newScale = Math.min(1, availableWidth / 800);
-                setScale(Math.max(0.2, newScale)); // Minimum scale 0.2
+        const recalculate = () => {
+            if (!scrollContainerRef.current) return;
+            const containerWidth = scrollContainerRef.current.clientWidth;
+            const padding = window.innerWidth < 640 ? 32 : 64;
+            const availableWidth = Math.max(containerWidth - padding, 100);
+            const newScale = Math.min(1, availableWidth / 800);
+            setScale(Math.max(0.2, newScale));
+
+            if (documentRef.current) {
+                setContentHeight(documentRef.current.offsetHeight);
             }
         };
 
-        // Delay slightly for initial layout to settle
-        const timer = setTimeout(updateScale, 50);
-        window.addEventListener("resize", updateScale);
-        return () => {
-            clearTimeout(timer);
-            window.removeEventListener("resize", updateScale);
-        };
-    }, []);
+        // Watch container size changes (sidebar toggle, window resize, etc.)
+        const containerObserver = new ResizeObserver(recalculate);
+        if (scrollContainerRef.current) containerObserver.observe(scrollContainerRef.current);
 
-    useEffect(() => {
-        if (documentRef.current) {
-            setContentHeight(documentRef.current.offsetHeight);
-        }
-    }, [invoice, scale, isFullScreen]);
+        // Watch document height changes (when invoice data loads)
+        const docObserver = new ResizeObserver(recalculate);
+        if (documentRef.current) docObserver.observe(documentRef.current);
+
+        recalculate();
+
+        return () => {
+            containerObserver.disconnect();
+            docObserver.disconnect();
+        };
+    }, [invoice, isFullScreen]);
 
     useEffect(() => {
         const handleFullscreenChange = () => setIsFullScreen(!!document.fullscreenElement);
@@ -343,15 +346,16 @@ export default function ViewInvoicePage() {
                 {/* PDF Viewer Scroll Area */}
                 <div
                     ref={scrollContainerRef}
-                    className="w-full overflow-auto flex justify-center p-4 sm:p-8 custom-scrollbar bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0"
+                    className="w-full overflow-auto flex justify-center py-4 sm:py-8 custom-scrollbar bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0"
                     style={{ height: isFullScreen ? 'calc(100vh - 48px)' : 'calc(100vh - 200px)', touchAction: 'pan-x pan-y' }}
                 >
+                    {/* Wrapper that collapses to the scaled size, keeping the document centered */}
                     <div
                         style={{
                             width: `${800 * scale}px`,
                             height: `${contentHeight * scale}px`,
-                            transition: 'width 0.2s ease-out, height 0.2s ease-out',
-                            position: 'relative'
+                            flexShrink: 0,
+                            position: 'relative',
                         }}
                     >
                         <div

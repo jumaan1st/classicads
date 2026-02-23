@@ -89,9 +89,7 @@ export default function ServiceDetailPage() {
               Timeline: {service.timelineWeeks.min}–{service.timelineWeeks.max} weeks
             </p>
 
-            <Button href={`/quote?service=${service.slug}`} className="mt-6">
-              Get a Quote
-            </Button>
+
           </div>
         </div>
 

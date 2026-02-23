@@ -55,12 +55,12 @@ export default function FloatingContactWidget() {
     }
 
     return (
-        <div ref={ref} className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3">
+        <div ref={ref} className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
 
             {/* ── Expanded Panel ─────────────────────────────────────── */}
             <div
-                className={`transition-all duration-300 origin-bottom-right ${open
-                    ? 'opacity-100 scale-100 translate-y-0 pointer-events-auto'
+                className={`transition-all duration-300 origin-bottom-right pointer-events-auto ${open
+                    ? 'opacity-100 scale-100 translate-y-0'
                     : 'opacity-0 scale-95 translate-y-4 pointer-events-none'
                     }`}
             >
@@ -154,6 +154,7 @@ export default function FloatingContactWidget() {
 
             {/* ── FAB Trigger Button ─────────────────────────────────── */}
             <button
+                style={{ pointerEvents: 'auto' }}
                 onClick={toggle}
                 aria-label={open ? 'Close contact widget' : 'Open contact widget'}
                 className={`relative flex items-center justify-center w-14 h-14 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95

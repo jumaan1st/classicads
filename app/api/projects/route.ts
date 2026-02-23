@@ -34,7 +34,7 @@ const EMPLOYEE_NAMES: Record<string, string> = {
   EMP3: "David Kim",
 };
 
-const DUMMY_PROJECTS: Project[] = [
+export const DUMMY_PROJECTS: Project[] = [
   {
     id: "P1",
     title: "Mitchell Living Room",
