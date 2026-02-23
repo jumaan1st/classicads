@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import MainWrap from "@/components/MainWrap";
+import FloatingContactWidget from "@/components/FloatingContactWidget";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -50,6 +51,7 @@ export default function RootLayout({
         <ThemeProvider>
           <Nav />
           <MainWrap>{children}</MainWrap>
+          <FloatingContactWidget />
           <Footer />
         </ThemeProvider>
       </body>

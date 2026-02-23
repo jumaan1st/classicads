@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Eye } from "lucide-react";
 import Card from "@/components/Card";
 
@@ -25,6 +25,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function InvoicesPage() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,13 +54,13 @@ export default function InvoicesPage() {
           </h1>
           <p className="text-[var(--muted)] text-sm">Track billing, overdue payments, and revenue collection.</p>
         </div>
-        <Link
-          href="/dashboard/invoices/new"
+        <button
+          onClick={() => router.push("/dashboard/invoices/new")}
           className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[var(--foreground)] text-[var(--background)] font-bold rounded-xl hover:bg-[var(--accent)] hover:text-white transition-all duration-300 shadow-sm"
         >
           <Plus className="w-5 h-5" />
           Create Invoice
-        </Link>
+        </button>
       </div>
 
       <Card className="overflow-hidden bg-[var(--card)]/90 backdrop-blur-xl border border-[var(--border)] shadow-sm">
@@ -78,7 +79,11 @@ export default function InvoicesPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {invoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-blue-500/5 transition-colors group">
+                <tr
+                  key={inv.id}
+                  onClick={() => router.push(`/dashboard/invoices/${inv.id}`)}
+                  className="hover:bg-blue-500/5 transition-colors group cursor-pointer"
+                >
                   <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">
                     <span className="text-[var(--muted)] text-xs mr-1">#</span>{inv.invoiceNumber}
                   </td>
@@ -102,13 +107,12 @@ export default function InvoicesPage() {
                     {inv.total.toLocaleString()}
                   </td>
                   <td className="p-4 sm:px-6 text-right">
-                    <Link
-                      href={`/dashboard/invoices/${inv.id}`}
-                      className="inline-flex items-center justify-center p-2 rounded-lg bg-[var(--muted-bg)] text-[var(--foreground)] hover:bg-blue-500/20 hover:text-blue-400 transition-colors"
+                    <button
+                      className="inline-flex items-center justify-center p-2 rounded-lg bg-[var(--muted-bg)] text-[var(--foreground)] hover:bg-blue-500/20 group-hover:bg-blue-500/20 group-hover:text-blue-500 hover:text-blue-500 transition-colors"
                       title="View Invoice"
                     >
                       <Eye className="w-4 h-4" />
-                    </Link>
+                    </button>
                   </td>
                 </tr>
               ))}

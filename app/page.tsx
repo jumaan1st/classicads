@@ -53,28 +53,29 @@ export default async function Home() {
           <p className="text-[var(--muted)] mt-3 sm:mt-4 text-base sm:text-lg">We provide an end-to-end design array that blends modern aesthetics with profound utility and seamless layouts.</p>
         </div>
 
+        {/* Mobile: all 3 services in a vertical stack. MD+: 2-col bento */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {/* Large feature service spanning 2 columns */}
           {threeServices.length > 0 && (
-            <Link href={`/services/${threeServices[0]?.slug}`} className="md:col-span-2 relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] aspect-[4/3] md:aspect-auto">
+            <Link href={`/services/${threeServices[0]?.slug}`} className="md:col-span-2 relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] aspect-[3/2] md:aspect-auto md:min-h-[380px]">
               <Image src={threeServices[0]?.image} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" alt="Service 1" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 p-6 sm:p-10 w-full">
-                <div className="bg-blue-500 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 px-2.5 sm:px-3 rounded-md w-max mb-3 sm:mb-4">Featured Service</div>
-                <h3 className="text-2xl sm:text-3xl md:text-4xl font-heading font-bold text-white mb-2">{threeServices[0]?.name}</h3>
-                <p className="text-white/80 max-w-md line-clamp-2 text-sm sm:text-base md:text-lg">{threeServices[0]?.description}</p>
+              <div className="absolute bottom-0 left-0 p-5 sm:p-10 w-full">
+                <div className="bg-blue-500 text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider py-1 px-2.5 sm:px-3 rounded-md w-max mb-2 sm:mb-4">Featured Service</div>
+                <h3 className="text-xl sm:text-3xl md:text-4xl font-heading font-bold text-white mb-1 sm:mb-2">{threeServices[0]?.name}</h3>
+                <p className="text-white/80 max-w-md line-clamp-2 text-xs sm:text-base md:text-lg">{threeServices[0]?.description}</p>
               </div>
             </Link>
           )}
-          {/* Two smaller services stacked */}
-          <div className="flex flex-col gap-4 sm:gap-6">
+          {/* Two smaller services: side-by-side on mobile, stacked on md+ */}
+          <div className="grid grid-cols-2 md:grid-cols-1 gap-4 sm:gap-6">
             {threeServices.slice(1, 3).map((s) => (
-              <Link key={s.id} href={`/services/${s.slug}`} className="flex-1 relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] min-h-[220px] sm:min-h-[280px]">
+              <Link key={s.id} href={`/services/${s.slug}`} className="relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] aspect-square md:aspect-auto md:flex-1 md:min-h-[175px]">
                 <Image src={s.image} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" alt={s.name} />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
-                <div className="absolute bottom-0 left-0 p-6 sm:p-8 w-full">
-                  <h3 className="text-xl sm:text-2xl font-heading font-bold text-white mb-1">{s.name}</h3>
-                  <p className="text-white/70 text-xs sm:text-sm">Starting at ₹{s.priceRange.min.toLocaleString()}</p>
+                <div className="absolute bottom-0 left-0 p-3 sm:p-6 md:p-8 w-full">
+                  <h3 className="text-sm sm:text-xl md:text-2xl font-heading font-bold text-white mb-0.5 sm:mb-1 leading-tight">{s.name}</h3>
+                  <p className="text-white/70 text-[10px] sm:text-sm hidden xs:block">Starting at ₹{s.priceRange.min.toLocaleString()}</p>
                 </div>
               </Link>
             ))}
@@ -126,39 +127,43 @@ export default async function Home() {
       </section>
 
       {/* 4. FEATURED PROJECTS PORTFOLIO */}
-      <section className="py-24 px-5 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6 pt-10 text-center md:text-left">
+      <section className="py-16 sm:py-24 px-4 sm:px-5 max-w-7xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 sm:mb-16 gap-4 sm:gap-6 pt-6 sm:pt-10 text-center md:text-left">
           <div className="max-w-xl mx-auto md:mx-0">
-            <h2 className="font-heading text-4xl md:text-5xl font-bold text-[var(--foreground)]">Recent Triumphs.</h2>
-            <p className="text-[var(--muted)] mt-4 text-lg">Explore a curated selection of our most prestigious design projects.</p>
+            <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--foreground)]">Recent Triumphs.</h2>
+            <p className="text-[var(--muted)] mt-3 sm:mt-4 text-base sm:text-lg">Explore a curated selection of our most prestigious design projects.</p>
           </div>
           <div className="flex justify-center md:justify-end">
-            <Link href="/projects" className="inline-flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-6 py-3 rounded-full text-[var(--foreground)] font-semibold hover:bg-[var(--muted-bg)] transition-colors shadow-sm">
+            <Link href="/projects" className="inline-flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] px-5 sm:px-6 py-2.5 sm:py-3 rounded-full text-[var(--foreground)] font-semibold hover:bg-[var(--muted-bg)] transition-colors shadow-sm text-sm sm:text-base">
               See All Work <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8">
           {sixProjects.map(p => (
-            <Link href={`/projects`} key={p.id} className="group relative rounded-3xl overflow-hidden border border-[var(--border)] bg-[var(--card)] aspect-[4/3] sm:aspect-[16/11] shadow-sm">
+            <Link href={`/projects`} key={p.id} className="group relative rounded-2xl sm:rounded-3xl overflow-hidden border border-[var(--border)] bg-[var(--card)] aspect-[4/3] shadow-sm">
               <Image src={p.image} fill className="object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-90" alt={p.title} />
 
-              {/* Always show a slight gradient at the bottom for readability */}
+              {/* Always-visible gradient for readability */}
               <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
 
-              {/* Hover overlay for a sleek website builder interactive feel */}
+              {/* Hover overlay — desktop only effect */}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]" />
 
-              <div className="absolute inset-x-0 bottom-0 p-8 sm:p-10 flex flex-col justify-end translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  <span className="text-blue-400 font-bold text-[10px] sm:text-[11px] uppercase tracking-widest bg-blue-500/10 px-2.5 py-1 rounded backdrop-blur-md border border-blue-500/20">Featured Project</span>
-                  <span className="text-white/80 font-medium text-[10px] sm:text-[11px] uppercase tracking-widest bg-white/10 px-2.5 py-1 rounded backdrop-blur-md border border-white/10">{p.clientName}</span>
+              {/* Card content — always visible on mobile, animates on desktop */}
+              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8 flex flex-col justify-end">
+                <div className="flex items-center gap-2 mb-2 sm:mb-3 flex-wrap">
+                  <span className="text-blue-400 font-bold text-[10px] uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded backdrop-blur-md border border-blue-500/20">Featured</span>
+                  <span className="text-white/80 font-medium text-[10px] uppercase tracking-widest bg-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded backdrop-blur-md border border-white/10">{p.clientName}</span>
                 </div>
-                <h3 className="font-heading text-2xl md:text-3xl font-bold text-white leading-tight">{p.title}</h3>
+                <h3 className="font-heading text-lg sm:text-2xl md:text-3xl font-bold text-white leading-tight">{p.title}</h3>
 
-                {/* Appears on hover */}
-                <div className="mt-4 pt-4 border-t border-white/20 flex items-center gap-2 text-white/90 font-medium opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 overflow-hidden h-0 group-hover:h-auto">
+                {/* "Explore" row: always visible on mobile, appears on hover on desktop */}
+                <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-white/90 font-medium text-sm
+                              sm:opacity-0 sm:h-0 sm:overflow-hidden sm:mt-0 sm:pt-0 sm:border-0
+                              sm:group-hover:opacity-100 sm:group-hover:h-auto sm:group-hover:mt-4 sm:group-hover:pt-4 sm:group-hover:border-t
+                              transition-all duration-300">
                   Explore Case Study <ArrowRight className="h-4 w-4" />
                 </div>
               </div>

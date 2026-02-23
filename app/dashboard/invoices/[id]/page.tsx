@@ -7,6 +7,7 @@ import Card from "@/components/Card";
 import { useParams } from "next/navigation";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
+import { QRCodeSVG } from "qrcode.react";
 
 type InvoiceDetailed = {
     id: string;
@@ -40,6 +41,7 @@ export default function ViewInvoicePage() {
     const params = useParams();
     const documentRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const [invoice, setInvoice] = useState<InvoiceDetailed | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -49,9 +51,25 @@ export default function ViewInvoicePage() {
     const [isFullScreen, setIsFullScreen] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== "undefined" && window.innerWidth < 850) {
-            setScale(window.innerWidth / 850);
-        }
+        const updateScale = () => {
+            if (scrollContainerRef.current) {
+                const containerWidth = scrollContainerRef.current.clientWidth;
+                // Leave 32px padding total on mobile, 64px on larger screens
+                const padding = window.innerWidth < 640 ? 32 : 64;
+                const availableWidth = containerWidth - padding;
+                // Calculate scale to exactly fit the available width. Cap it at 1 for desktop so it doesn't get huge.
+                const newScale = Math.min(1, availableWidth / 800);
+                setScale(Math.max(0.2, newScale)); // Minimum scale 0.2
+            }
+        };
+
+        // Delay slightly for initial layout to settle
+        const timer = setTimeout(updateScale, 50);
+        window.addEventListener("resize", updateScale);
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener("resize", updateScale);
+        };
     }, []);
 
     useEffect(() => {
@@ -324,6 +342,7 @@ export default function ViewInvoicePage() {
 
                 {/* PDF Viewer Scroll Area */}
                 <div
+                    ref={scrollContainerRef}
                     className="w-full overflow-auto flex justify-center p-4 sm:p-8 custom-scrollbar bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0"
                     style={{ height: isFullScreen ? 'calc(100vh - 48px)' : 'calc(100vh - 200px)', touchAction: 'pan-x pan-y' }}
                 >
@@ -354,52 +373,41 @@ export default function ViewInvoicePage() {
 
                                 <div className="w-full">
                                     {/* Header Section */}
-                                    <div className="flex flex-row justify-between items-start gap-8 mb-12">
-                                        <div className="flex items-start gap-4">
-                                            <div className="w-16 h-16 bg-[var(--foreground)] text-[var(--background)] rounded-2xl flex items-center justify-center shrink-0 shadow-lg">
-                                                <Building2 className="w-8 h-8" />
+                                    <div className="flex flex-row justify-between items-start gap-8 mb-16">
+                                        <div className="flex flex-col gap-2">
+                                            {/* Minimal Text Logo matching Nav */}
+                                            <div className="font-heading font-bold tracking-tight text-[var(--foreground)] text-3xl">
+                                                Classic<span className="text-blue-600 dark:text-blue-500">Ads</span>
                                             </div>
-                                            <div>
-                                                <h2 className="text-3xl font-heading font-black tracking-tighter text-[var(--foreground)] mb-1">
-                                                    CLASSIC ADS
-                                                </h2>
-                                                <div className="text-sm text-[var(--muted)] space-y-0.5">
-                                                    <p>123 Luxury Avenue, Suite 100</p>
-                                                    <p>Mumbai, MH 400001</p>
-                                                    <p className="mt-2 font-medium">GSTIN: 27AABCU9603R1ZM</p>
-                                                </div>
+                                            <div className="text-sm text-[var(--muted)] space-y-0.5 mt-2">
+                                                <p>123 Luxury Avenue, Suite 100</p>
+                                                <p>Mumbai, MH 400001</p>
+                                                <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: 27AABCU9603R1ZM</p>
                                             </div>
                                         </div>
 
-                                        <div className="text-right bg-[var(--muted-bg)]/50 p-5 rounded-xl border border-[var(--border)] min-w-[200px]">
-                                            <h3 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-3">Invoice Details</h3>
-                                            <div className="space-y-2">
-                                                <div className="flex justify-end gap-6 text-sm">
-                                                    <span className="text-[var(--muted)]">No.</span>
-                                                    <span className="font-bold text-[var(--foreground)]">{invoice.invoiceNumber}</span>
-                                                </div>
-                                                <div className="flex justify-end gap-6 text-sm">
-                                                    <span className="text-[var(--muted)]">Issued</span>
-                                                    <span className="font-medium text-[var(--foreground)]">{new Date(invoice.issueDate).toLocaleDateString()}</span>
-                                                </div>
-                                                <div className="flex justify-end gap-6 text-sm">
-                                                    <span className="text-[var(--muted)]">Due</span>
-                                                    <span className="font-medium text-[var(--foreground)]">{new Date(invoice.dueDate).toLocaleDateString()}</span>
-                                                </div>
+                                        <div className="text-right flex flex-col items-end gap-1">
+                                            <h1 className="text-4xl font-heading font-black tracking-tight text-blue-600 dark:text-blue-500 mb-2">INVOICE</h1>
+                                            <div className="flex justify-end gap-4 text-sm w-48">
+                                                <span className="text-[var(--muted)] text-left flex-1">No.</span>
+                                                <span className="font-bold text-[var(--foreground)] text-right">{invoice.invoiceNumber}</span>
+                                            </div>
+                                            <div className="flex justify-end gap-4 text-sm w-48">
+                                                <span className="text-[var(--muted)] text-left flex-1">Issued</span>
+                                                <span className="font-medium text-[var(--foreground)] text-right">{new Date(invoice.issueDate).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex justify-end gap-4 text-sm w-48">
+                                                <span className="text-[var(--muted)] text-left flex-1">Due</span>
+                                                <span className="font-medium text-[var(--foreground)] text-right">{new Date(invoice.dueDate).toLocaleDateString()}</span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent mb-12" />
-
-                                    {/* Billing Info Grid */}
+                                    {/* Billing Info Grid — Clean & Minimal */}
                                     <div className="grid grid-cols-2 gap-8 mb-12">
-                                        <div className="space-y-4 relative">
-                                            <div className="flex items-center gap-2 mb-2 text-[var(--foreground)]">
-                                                <User className="w-4 h-4 text-blue-500" />
-                                                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Billed To</h3>
-                                            </div>
-                                            <div className="pl-6 border-l-2 border-blue-500/20">
+                                        <div className="space-y-3">
+                                            <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)] border-b border-[var(--border)] pb-2">Billed To</h3>
+                                            <div>
                                                 <p className="font-bold text-[var(--foreground)] text-lg mb-1">{invoice.clientName}</p>
                                                 <div className="text-sm text-[var(--muted)] space-y-1">
                                                     {invoice.clientEmail && <p>{invoice.clientEmail}</p>}
@@ -426,66 +434,92 @@ export default function ViewInvoicePage() {
                                     </div>
 
                                     {/* Line Items Table */}
-                                    <div className="mb-12 border border-[var(--border)] rounded-xl overflow-hidden shadow-sm">
+                                    <div className="mb-12">
                                         <table className="w-full text-left text-sm">
-                                            <thead className="bg-[var(--muted-bg)]">
-                                                <tr className="border-b border-[var(--border)] text-[var(--muted)] font-bold text-xs uppercase tracking-wider">
-                                                    <th className="py-4 px-6">Description</th>
-                                                    <th className="py-4 px-6 text-center w-24">Qty</th>
-                                                    <th className="py-4 px-6 text-right w-32">Rate ({invoice.currency})</th>
-                                                    <th className="py-4 px-6 text-right w-40">Amount ({invoice.currency})</th>
+                                            <thead>
+                                                <tr className="border-b-2 border-[var(--border)] text-[var(--foreground)] font-bold text-xs uppercase tracking-wider text-left">
+                                                    <th className="py-3 px-2">Description</th>
+                                                    <th className="py-3 px-2 text-center w-24">Qty</th>
+                                                    <th className="py-3 px-2 text-right w-32">Rate ({invoice.currency})</th>
+                                                    <th className="py-3 px-2 text-right w-40">Amount ({invoice.currency})</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-[var(--border)] bg-[var(--background)]">
+                                            <tbody className="divide-y divide-[var(--border)]">
                                                 {invoice.serviceCharge > 0 && (
-                                                    <tr className="hover:bg-[var(--muted-bg)]/50 transition-colors">
-                                                        <td className="py-4 px-6 font-medium text-[var(--foreground)]">
+                                                    <tr>
+                                                        <td className="py-4 px-2 font-medium text-[var(--foreground)]">
                                                             Design & Service Charge
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-0.5">Professional consultation and finalized 3D renders</p>
+                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">Professional consultation and finalized 3D renders</p>
                                                         </td>
-                                                        <td className="py-4 px-6 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-6 text-right text-[var(--muted)]">{invoice.serviceCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-6 text-right font-medium text-[var(--foreground)]">{invoice.serviceCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
+                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.serviceCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.serviceCharge.toLocaleString()}</td>
                                                     </tr>
                                                 )}
                                                 {invoice.labourCharge > 0 && (
-                                                    <tr className="hover:bg-[var(--muted-bg)]/50 transition-colors">
-                                                        <td className="py-4 px-6 font-medium text-[var(--foreground)]">
+                                                    <tr>
+                                                        <td className="py-4 px-2 font-medium text-[var(--foreground)]">
                                                             Labour & Execution Charge
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-0.5">On-site execution, management and assembly</p>
+                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">On-site execution, management and assembly</p>
                                                         </td>
-                                                        <td className="py-4 px-6 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-6 text-right text-[var(--muted)]">{invoice.labourCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-6 text-right font-medium text-[var(--foreground)]">{invoice.labourCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
+                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.labourCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.labourCharge.toLocaleString()}</td>
                                                     </tr>
                                                 )}
                                                 {invoice.otherCharge > 0 && (
-                                                    <tr className="hover:bg-[var(--muted-bg)]/50 transition-colors">
-                                                        <td className="py-4 px-6 font-medium text-[var(--foreground)]">
+                                                    <tr>
+                                                        <td className="py-4 px-2 font-medium text-[var(--foreground)]">
                                                             Material & Logistics
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-0.5">Transport, handling, and miscellanous procuring</p>
+                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">Transport, handling, and miscellaneous procuring</p>
                                                         </td>
-                                                        <td className="py-4 px-6 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-6 text-right text-[var(--muted)]">{invoice.otherCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-6 text-right font-medium text-[var(--foreground)]">{invoice.otherCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
+                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.otherCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.otherCharge.toLocaleString()}</td>
                                                     </tr>
                                                 )}
                                             </tbody>
                                         </table>
                                     </div>
 
-                                    {/* Totals & Signatures */}
-                                    <div className="flex flex-row justify-between items-end gap-12">
+                                    {/* Totals & Payment (Bottom section) */}
+                                    <div className="flex flex-row justify-between items-start gap-12 border-t border-[var(--border)] pt-8">
 
-                                        {/* Bank Details / Notes (Bottom Left) */}
-                                        <div className="w-[350px] bg-[var(--muted-bg)]/30 rounded-xl p-6 border border-[var(--border)] border-dashed">
-                                            <h4 className="text-[var(--foreground)] font-bold text-sm mb-3">Bank Details</h4>
-                                            <div className="space-y-1.5 text-xs text-[var(--muted)]">
-                                                <p><span className="font-semibold text-[var(--foreground)] w-24 inline-block">Bank Name:</span> HDFC Bank, Fort Branch</p>
-                                                <p><span className="font-semibold text-[var(--foreground)] w-24 inline-block">Account Name:</span> Classic Ads Pvt Ltd</p>
-                                                <p><span className="font-semibold text-[var(--foreground)] w-24 inline-block">Account No:</span> 50200012345678</p>
-                                                <p><span className="font-semibold text-[var(--foreground)] w-24 inline-block">IFSC Code:</span> HDFC0001234</p>
-                                            </div>
+                                        {/* Payment Method (QR Code fallback logic) */}
+                                        <div className="w-[300px]">
+                                            <h4 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-4">Payment Options</h4>
+
+                                            {invoice.total < 100000 ? (
+                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3">
+                                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                                        <QRCodeSVG
+                                                            value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads&am=${invoice.total}&cu=INR`}
+                                                            size={120}
+                                                            level="L"
+                                                            includeMargin={false}
+                                                        />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
+                                                        <p className="text-xs text-[var(--muted)] mt-0.5">GPay, PhonePe, Paytm accepted</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3">
+                                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                                        <QRCodeSVG
+                                                            value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads`}
+                                                            size={120}
+                                                            level="L"
+                                                            includeMargin={false}
+                                                        />
+                                                    </div>
+                                                    <div className="text-center">
+                                                        <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
+                                                        <p className="text-xs text-[var(--muted)] mt-0.5">Enter custom amount in app</p>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Calculations Container (Bottom Right) */}
