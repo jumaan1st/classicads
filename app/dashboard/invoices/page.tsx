@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { Plus, Eye } from "lucide-react";
 import Card from "@/components/Card";
 
+type InvoiceItem = {
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  amount: number;
+};
+
 type Invoice = {
   id: string;
   invoiceNumber: string;
@@ -15,13 +22,14 @@ type Invoice = {
   status: string;
   total: number;
   currency: string;
+  items: InvoiceItem[];
 };
 
 const statusColors: Record<string, string> = {
-  draft: "bg-[var(--muted-bg)] text-[var(--muted)]",
-  sent: "bg-[var(--button)]/20 text-[var(--button)]",
-  paid: "bg-[var(--accent)]/20 text-[var(--accent)]",
-  overdue: "bg-[var(--danger)]/20 text-[var(--danger)]",
+  draft: "bg-[var(--muted-bg)] text-[var(--muted)] border border-[var(--border)]",
+  sent: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+  paid: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  overdue: "bg-red-500/10 text-red-500 border border-red-500/20",
 };
 
 export default function InvoicesPage() {
@@ -71,6 +79,7 @@ export default function InvoicesPage() {
                 <th className="p-4 sm:px-6">Invoice</th>
                 <th className="p-4 sm:px-6">Project</th>
                 <th className="p-4 sm:px-6">Client</th>
+                <th className="p-4 sm:px-6 hidden md:table-cell">Services</th>
                 <th className="p-4 sm:px-6">Due</th>
                 <th className="p-4 sm:px-6">Status</th>
                 <th className="p-4 sm:px-6">Total</th>
@@ -78,47 +87,62 @@ export default function InvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
-              {invoices.map((inv) => (
-                <tr
-                  key={inv.id}
-                  onClick={() => router.push(`/dashboard/invoices/${inv.id}`)}
-                  className="hover:bg-blue-500/5 transition-colors group cursor-pointer"
-                >
-                  <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">
-                    <span className="text-[var(--muted)] text-xs mr-1">#</span>{inv.invoiceNumber}
-                  </td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.projectTitle}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.clientName}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)] font-medium">
-                    {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </td>
-                  <td className="p-4 sm:px-6">
-                    <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold tracking-widest uppercase border ${statusColors[inv.status]
-                        ? statusColors[inv.status].replace("text-", "text-").replace("bg-", "bg-opacity-10 border-").concat(" border-opacity-20 bg-[var(--accent)]/10 text-[var(--foreground)]")
-                        : "bg-[var(--muted-bg)] text-[var(--muted)] border-[var(--border)]"
-                        }`}
-                    >
-                      {inv.status}
-                    </span>
-                  </td>
-                  <td className="p-4 sm:px-6 font-bold text-[var(--foreground)] tracking-tight">
-                    <span className="text-[var(--muted)] font-medium text-xs mr-1">{inv.currency}</span>
-                    {inv.total.toLocaleString()}
-                  </td>
-                  <td className="p-4 sm:px-6 text-right">
-                    <button
-                      className="inline-flex items-center justify-center p-2 rounded-lg bg-[var(--muted-bg)] text-[var(--foreground)] hover:bg-blue-500/20 group-hover:bg-blue-500/20 group-hover:text-blue-500 hover:text-blue-500 transition-colors"
-                      title="View Invoice"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {invoices.map((inv) => {
+                const serviceNames = inv.items?.map((it) => it.description) ?? [];
+                const visibleServices = serviceNames.slice(0, 2);
+                const extraCount = serviceNames.length - 2;
+
+                return (
+                  <tr
+                    key={inv.id}
+                    onClick={() => router.push(`/dashboard/invoices/${inv.id}`)}
+                    className="hover:bg-blue-500/5 transition-colors group cursor-pointer"
+                  >
+                    <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">
+                      <span className="text-[var(--muted)] text-xs mr-1">#</span>{inv.invoiceNumber}
+                    </td>
+                    <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.projectTitle}</td>
+                    <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.clientName}</td>
+                    <td className="p-4 sm:px-6 hidden md:table-cell">
+                      <div className="flex flex-wrap gap-1.5">
+                        {visibleServices.map((name, i) => (
+                          <span key={i} className="inline-flex text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-[var(--muted-bg)] text-[var(--muted)] border border-[var(--border)] whitespace-nowrap">
+                            {name}
+                          </span>
+                        ))}
+                        {extraCount > 0 && (
+                          <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap">
+                            +{extraCount} more
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4 sm:px-6 text-[var(--muted)] font-medium">
+                      {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </td>
+                    <td className="p-4 sm:px-6">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold tracking-widest uppercase ${statusColors[inv.status] ?? statusColors.draft}`}>
+                        {inv.status}
+                      </span>
+                    </td>
+                    <td className="p-4 sm:px-6 font-bold text-[var(--foreground)] tracking-tight">
+                      <span className="text-[var(--muted)] font-medium text-xs mr-1">{inv.currency}</span>
+                      {inv.total.toLocaleString()}
+                    </td>
+                    <td className="p-4 sm:px-6 text-right">
+                      <button
+                        className="inline-flex items-center justify-center p-2 rounded-lg bg-[var(--muted-bg)] text-[var(--foreground)] hover:bg-blue-500/20 group-hover:bg-blue-500/20 group-hover:text-blue-500 hover:text-blue-500 transition-colors"
+                        title="View Invoice"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-[var(--muted)]">No invoices found.</td>
+                  <td colSpan={8} className="p-8 text-center text-[var(--muted)]">No invoices found.</td>
                 </tr>
               )}
             </tbody>

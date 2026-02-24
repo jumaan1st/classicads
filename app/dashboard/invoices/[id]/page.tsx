@@ -2,12 +2,19 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Send, Printer, Building2, User, FileText, CheckCircle2, ZoomIn, ZoomOut, Maximize, Minimize } from "lucide-react";
+import { ArrowLeft, Download, Send, Printer, FileText, CheckCircle2, ZoomIn, ZoomOut, Maximize, Minimize, ToggleLeft, ToggleRight } from "lucide-react";
 import Card from "@/components/Card";
 import { useParams } from "next/navigation";
 import { toJpeg } from "html-to-image";
 import jsPDF from "jspdf";
 import { QRCodeSVG } from "qrcode.react";
+
+type InvoiceItem = {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+};
 
 type InvoiceDetailed = {
     id: string;
@@ -20,14 +27,12 @@ type InvoiceDetailed = {
     issueDate: string;
     dueDate: string;
     status: string;
-    serviceCharge: number;
-    labourCharge: number;
-    otherCharge: number;
     subtotal: number;
     gstPercent: number;
     gstAmount: number;
     total: number;
     currency: string;
+    items: InvoiceItem[];
 };
 
 const statusColors: Record<string, string> = {
@@ -45,12 +50,12 @@ export default function ViewInvoicePage() {
     const [invoice, setInvoice] = useState<InvoiceDetailed | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [paidStatus, setPaidStatus] = useState<string>("draft");
 
     const [scale, setScale] = useState(1);
     const [contentHeight, setContentHeight] = useState(1200);
     const [isFullScreen, setIsFullScreen] = useState(false);
 
-    // Use ResizeObserver to keep scale and height in sync whenever the container or document changes
     useEffect(() => {
         const recalculate = () => {
             if (!scrollContainerRef.current) return;
@@ -59,26 +64,17 @@ export default function ViewInvoicePage() {
             const availableWidth = Math.max(containerWidth - padding, 100);
             const newScale = Math.min(1, availableWidth / 800);
             setScale(Math.max(0.2, newScale));
-
-            if (documentRef.current) {
-                setContentHeight(documentRef.current.offsetHeight);
-            }
+            if (documentRef.current) setContentHeight(documentRef.current.offsetHeight);
         };
 
-        // Watch container size changes (sidebar toggle, window resize, etc.)
         const containerObserver = new ResizeObserver(recalculate);
         if (scrollContainerRef.current) containerObserver.observe(scrollContainerRef.current);
 
-        // Watch document height changes (when invoice data loads)
         const docObserver = new ResizeObserver(recalculate);
         if (documentRef.current) docObserver.observe(documentRef.current);
 
         recalculate();
-
-        return () => {
-            containerObserver.disconnect();
-            docObserver.disconnect();
-        };
+        return () => { containerObserver.disconnect(); docObserver.disconnect(); };
     }, [invoice, isFullScreen]);
 
     useEffect(() => {
@@ -90,12 +86,11 @@ export default function ViewInvoicePage() {
     useEffect(() => {
         const container = viewerRef.current;
         if (!container) return;
-
         let startDist = 0;
 
         const onTouchStart = (e: TouchEvent) => {
             if (e.touches.length === 2) {
-                e.preventDefault(); // Stop native page pinch zoom immediately
+                e.preventDefault();
                 startDist = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
@@ -105,7 +100,7 @@ export default function ViewInvoicePage() {
 
         const onTouchMove = (e: TouchEvent) => {
             if (e.touches.length === 2) {
-                e.preventDefault(); // Block native zooming while actively pinching
+                e.preventDefault();
                 const dist = Math.hypot(
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
@@ -120,7 +115,6 @@ export default function ViewInvoicePage() {
 
         container.addEventListener("touchstart", onTouchStart, { passive: false });
         container.addEventListener("touchmove", onTouchMove, { passive: false });
-
         return () => {
             container.removeEventListener("touchstart", onTouchStart);
             container.removeEventListener("touchmove", onTouchMove);
@@ -135,48 +129,33 @@ export default function ViewInvoicePage() {
         }
     };
 
+    const togglePaidStatus = () => {
+        setPaidStatus(prev => prev === "paid" ? "sent" : "paid");
+    };
+
     const generatePDF = async (): Promise<jsPDF | null> => {
         if (!documentRef.current || !invoice) return null;
-
         const htmlEl = document.documentElement;
         const wasDark = htmlEl.classList.contains("dark");
-        if (wasDark) {
-            htmlEl.classList.remove("dark");
-            htmlEl.classList.add("light");
-            htmlEl.style.colorScheme = "light";
-        }
+        if (wasDark) { htmlEl.classList.remove("dark"); htmlEl.classList.add("light"); htmlEl.style.colorScheme = "light"; }
 
         try {
             await new Promise(resolve => setTimeout(resolve, 50));
-
             const dataUrl = await toJpeg(documentRef.current, {
-                pixelRatio: 2,
-                quality: 0.95,
-                backgroundColor: "#ffffff",
+                pixelRatio: 2, quality: 0.95, backgroundColor: "#ffffff",
                 style: { transform: 'none' },
             });
-
-            const pdf = new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: "a4",
-            });
-
+            const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
             const imgProps = pdf.getImageProperties(dataUrl);
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-
             pdf.addImage(dataUrl, "JPEG", 0, 0, pdfWidth, pdfHeight);
             return pdf;
         } catch (error) {
             console.error("Error generating PDF:", error);
             return null;
         } finally {
-            if (wasDark) {
-                htmlEl.classList.add("dark");
-                htmlEl.classList.remove("light");
-                htmlEl.style.colorScheme = "dark";
-            }
+            if (wasDark) { htmlEl.classList.add("dark"); htmlEl.classList.remove("light"); htmlEl.style.colorScheme = "dark"; }
         }
     };
 
@@ -184,21 +163,14 @@ export default function ViewInvoicePage() {
         setIsDownloading(true);
         const pdf = await generatePDF();
         setIsDownloading(false);
-
         if (pdf) {
             const blob = pdf.output("blob");
             const blobUrl = URL.createObjectURL(blob);
             const iframe = document.createElement("iframe");
-            iframe.style.display = "none";
-            iframe.src = blobUrl;
+            iframe.style.display = "none"; iframe.src = blobUrl;
             document.body.appendChild(iframe);
             iframe.contentWindow?.print();
-
-            // Cleanup
-            setTimeout(() => {
-                document.body.removeChild(iframe);
-                URL.revokeObjectURL(blobUrl);
-            }, 1000 * 60 * 5); // Allow 5 minutes for print dialog before revoking
+            setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 1000 * 60 * 5);
         }
     };
 
@@ -206,10 +178,7 @@ export default function ViewInvoicePage() {
         setIsDownloading(true);
         const pdf = await generatePDF();
         setIsDownloading(false);
-
-        if (pdf) {
-            pdf.save(`Invoice_${invoice?.invoiceNumber}.pdf`);
-        }
+        if (pdf) pdf.save(`Invoice_${invoice?.invoiceNumber}.pdf`);
     };
 
     useEffect(() => {
@@ -217,18 +186,8 @@ export default function ViewInvoicePage() {
             .then((r) => r.json())
             .then((data) => {
                 if (!data.error) {
-                    const service = data.items?.[0]?.amount || 0;
-                    const labour = data.items?.[1]?.amount || 0;
-                    const other = data.items?.[2]?.amount || 0;
-
-                    setInvoice({
-                        ...data,
-                        clientNumber: "+91 98765 00000",
-                        clientGst: "29AAAAA0000A1Z5",
-                        serviceCharge: service,
-                        labourCharge: labour,
-                        otherCharge: other,
-                    });
+                    setInvoice({ ...data, clientNumber: "+91 98765 00000", clientGst: "29AAAAA0000A1Z5" });
+                    setPaidStatus(data.status);
                 }
             })
             .finally(() => setLoading(false));
@@ -253,6 +212,8 @@ export default function ViewInvoicePage() {
         );
     }
 
+    const isPaid = paidStatus === "paid";
+
     return (
         <div className="space-y-6 max-w-4xl mx-auto pb-12">
             <style dangerouslySetInnerHTML={{
@@ -262,23 +223,8 @@ export default function ViewInvoicePage() {
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
                     body * { visibility: hidden; }
                     #print-section, #print-section * { visibility: visible; }
-                    #print-section {
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        margin: 0;
-                        padding: 0;
-                        transform: none !important;
-                        box-shadow: none !important;
-                    }
-                    /* Override height on containers so print is not cut off */
-                    .custom-scrollbar {
-                        height: auto !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                    }
-                    /* Force light theme colors on print */
+                    #print-section { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; transform: none !important; box-shadow: none !important; }
+                    .custom-scrollbar { height: auto !important; max-height: none !important; overflow: visible !important; }
                     .dark { color-scheme: light !important; }
                 }
             `}} />
@@ -297,13 +243,26 @@ export default function ViewInvoicePage() {
                             <h1 className="font-heading text-2xl font-bold text-[var(--foreground)] tracking-tight">
                                 {invoice.invoiceNumber}
                             </h1>
-                            <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md border ${statusColors[invoice.status] || statusColors.draft}`}>
-                                {invoice.status}
+                            <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md border ${statusColors[paidStatus] || statusColors.draft}`}>
+                                {paidStatus}
                             </span>
                         </div>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:gap-3 print:hidden">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                    {/* Mark Paid/Unpaid toggle */}
+                    <button
+                        onClick={togglePaidStatus}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-xs font-bold ${isPaid
+                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-500"
+                            : "bg-[var(--muted-bg)] border-[var(--border)] text-[var(--foreground)] hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-500"
+                            }`}
+                        title={isPaid ? "Mark as Unpaid" : "Mark as Paid"}
+                    >
+                        {isPaid ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
+                        <span className="hidden sm:inline">{isPaid ? "Paid" : "Mark Paid"}</span>
+                    </button>
+
                     <button
                         onClick={handleDownloadPDF}
                         disabled={isDownloading}
@@ -326,10 +285,10 @@ export default function ViewInvoicePage() {
                 </div>
             </div>
 
-            {/* Structured Invoice Document */}
+            {/* Document Viewer */}
             <div ref={viewerRef} className="w-full flex-col flex items-center bg-[var(--background)] sm:bg-[var(--muted-bg)]/20 mt-4 border-y border-[var(--border)] sm:border sm:rounded-xl overflow-hidden print:border-none print:mt-0 print:bg-transparent">
 
-                {/* Custom PDF Viewer Controls */}
+                {/* Viewer Controls */}
                 <div className="w-full h-12 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between px-4 print:hidden shrink-0 shadow-sm z-10 relative">
                     <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Preview Document</span>
                     <div className="flex items-center gap-1.5 sm:gap-3 bg-[var(--muted-bg)] p-1 rounded-lg border border-[var(--border)]">
@@ -343,43 +302,27 @@ export default function ViewInvoicePage() {
                     </div>
                 </div>
 
-                {/* PDF Viewer Scroll Area */}
+                {/* PDF Scroll Area */}
                 <div
                     ref={scrollContainerRef}
                     className="w-full overflow-auto flex justify-center py-4 sm:py-8 custom-scrollbar bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0"
                     style={{ height: isFullScreen ? 'calc(100vh - 48px)' : 'calc(100vh - 200px)', touchAction: 'pan-x pan-y' }}
                 >
-                    {/* Wrapper that collapses to the scaled size, keeping the document centered */}
-                    <div
-                        style={{
-                            width: `${800 * scale}px`,
-                            height: `${contentHeight * scale}px`,
-                            flexShrink: 0,
-                            position: 'relative',
-                        }}
-                    >
+                    <div style={{ width: `${800 * scale}px`, height: `${contentHeight * scale}px`, flexShrink: 0, position: 'relative' }}>
                         <div
                             id="print-section"
                             ref={documentRef}
-                            style={{
-                                transform: `scale(${scale})`,
-                                transformOrigin: 'top left',
-                                width: '800px',
-                                position: 'absolute',
-                                left: 0,
-                                top: 0,
-                            }}
+                            style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: '800px', position: 'absolute', left: 0, top: 0 }}
                             className="bg-white dark:bg-[var(--card)] shadow-2xl print:shadow-none rounded-xl print:rounded-none"
                         >
                             <Card className="p-8 sm:p-12 border border-[var(--border)] print:border-none relative overflow-hidden rounded-xl print:rounded-none bg-[var(--card)] print:bg-transparent">
-                                {/* Document Border Status Color Indicator (Hidden in print to save ink unless 'background graphics' is ticked) */}
-                                <div className={`absolute top-0 left-0 w-full h-1.5 ${invoice.status === 'paid' ? 'bg-emerald-500' : invoice.status === 'overdue' ? 'bg-red-500' : 'bg-blue-500'}`} />
+                                {/* Status stripe */}
+                                <div className={`absolute top-0 left-0 w-full h-1.5 ${isPaid ? 'bg-emerald-500' : invoice.status === 'overdue' ? 'bg-red-500' : 'bg-blue-500'}`} />
 
                                 <div className="w-full">
-                                    {/* Header Section */}
+                                    {/* Header */}
                                     <div className="flex flex-row justify-between items-start gap-8 mb-16">
                                         <div className="flex flex-col gap-2">
-                                            {/* Minimal Text Logo matching Nav */}
                                             <div className="font-heading font-bold tracking-tight text-[var(--foreground)] text-3xl">
                                                 Classic<span className="text-blue-600 dark:text-blue-500">Ads</span>
                                             </div>
@@ -389,7 +332,6 @@ export default function ViewInvoicePage() {
                                                 <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: 27AABCU9603R1ZM</p>
                                             </div>
                                         </div>
-
                                         <div className="text-right flex flex-col items-end gap-1">
                                             <h1 className="text-4xl font-heading font-black tracking-tight text-blue-600 dark:text-blue-500 mb-2">INVOICE</h1>
                                             <div className="flex justify-end gap-4 text-sm w-48">
@@ -407,7 +349,7 @@ export default function ViewInvoicePage() {
                                         </div>
                                     </div>
 
-                                    {/* Billing Info Grid — Clean & Minimal */}
+                                    {/* Billing Info */}
                                     <div className="grid grid-cols-2 gap-8 mb-12">
                                         <div className="space-y-3">
                                             <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)] border-b border-[var(--border)] pb-2">Billed To</h3>
@@ -416,11 +358,10 @@ export default function ViewInvoicePage() {
                                                 <div className="text-sm text-[var(--muted)] space-y-1">
                                                     {invoice.clientEmail && <p>{invoice.clientEmail}</p>}
                                                     {invoice.clientNumber && <p>{invoice.clientNumber}</p>}
-                                                    {invoice.clientGst && <p className="mt-2 text-[var(--foreground)]"><span className="text-[var(--muted)] text-xs uppercase tracking-wider mr-2">GSTIN</span> {invoice.clientGst}</p>}
+                                                    {invoice.clientGst && <p className="mt-2 text-[var(--foreground)]"><span className="text-[var(--muted)] text-xs uppercase tracking-wider mr-2">GSTIN</span>{invoice.clientGst}</p>}
                                                 </div>
                                             </div>
                                         </div>
-
                                         <div className="space-y-4 relative border-l border-[var(--border)] pl-8">
                                             <div className="flex items-center gap-2 mb-2 text-[var(--foreground)]">
                                                 <FileText className="w-4 h-4 text-amber-500" />
@@ -437,7 +378,7 @@ export default function ViewInvoicePage() {
                                         </div>
                                     </div>
 
-                                    {/* Line Items Table */}
+                                    {/* Line Items — dynamic from invoice.items */}
                                     <div className="mb-12">
                                         <table className="w-full text-left text-sm">
                                             <thead>
@@ -449,59 +390,31 @@ export default function ViewInvoicePage() {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-[var(--border)]">
-                                                {invoice.serviceCharge > 0 && (
-                                                    <tr>
+                                                {invoice.items.map((item, idx) => (
+                                                    <tr key={idx}>
                                                         <td className="py-4 px-2 font-medium text-[var(--foreground)]">
-                                                            Design & Service Charge
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">Professional consultation and finalized 3D renders</p>
+                                                            {item.description}
+                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">Professional service as per scope of work</p>
                                                         </td>
-                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.serviceCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.serviceCharge.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">{item.quantity}</td>
+                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{item.unitPrice.toLocaleString()}</td>
+                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{item.amount.toLocaleString()}</td>
                                                     </tr>
-                                                )}
-                                                {invoice.labourCharge > 0 && (
-                                                    <tr>
-                                                        <td className="py-4 px-2 font-medium text-[var(--foreground)]">
-                                                            Labour & Execution Charge
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">On-site execution, management and assembly</p>
-                                                        </td>
-                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.labourCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.labourCharge.toLocaleString()}</td>
-                                                    </tr>
-                                                )}
-                                                {invoice.otherCharge > 0 && (
-                                                    <tr>
-                                                        <td className="py-4 px-2 font-medium text-[var(--foreground)]">
-                                                            Material & Logistics
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-1">Transport, handling, and miscellaneous procuring</p>
-                                                        </td>
-                                                        <td className="py-4 px-2 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-4 px-2 text-right text-[var(--muted)]">{invoice.otherCharge.toLocaleString()}</td>
-                                                        <td className="py-4 px-2 text-right font-medium text-[var(--foreground)]">{invoice.otherCharge.toLocaleString()}</td>
-                                                    </tr>
-                                                )}
+                                                ))}
                                             </tbody>
                                         </table>
                                     </div>
 
-                                    {/* Totals & Payment (Bottom section) */}
-                                    <div className="flex flex-row justify-between items-start gap-12 border-t border-[var(--border)] pt-8">
+                                    {/* Footer: Payment + Totals — wraps to column if items overflow */}
+                                    <div className="flex flex-col sm:flex-row justify-between items-start gap-10 border-t border-[var(--border)] pt-8 flex-wrap">
 
-                                        {/* Payment Method (QR Code fallback logic) */}
-                                        <div className="w-[300px]">
+                                        {/* QR Code */}
+                                        <div className="min-w-[220px]">
                                             <h4 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-4">Payment Options</h4>
-
                                             {invoice.total < 100000 ? (
-                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3">
+                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3 w-fit">
                                                     <div className="bg-white p-2 rounded-lg shadow-sm">
-                                                        <QRCodeSVG
-                                                            value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads&am=${invoice.total}&cu=INR`}
-                                                            size={120}
-                                                            level="L"
-                                                            includeMargin={false}
-                                                        />
+                                                        <QRCodeSVG value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads&am=${invoice.total}&cu=INR`} size={120} level="L" includeMargin={false} />
                                                     </div>
                                                     <div className="text-center">
                                                         <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
@@ -509,14 +422,9 @@ export default function ViewInvoicePage() {
                                                     </div>
                                                 </div>
                                             ) : (
-                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3">
+                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3 w-fit">
                                                     <div className="bg-white p-2 rounded-lg shadow-sm">
-                                                        <QRCodeSVG
-                                                            value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads`}
-                                                            size={120}
-                                                            level="L"
-                                                            includeMargin={false}
-                                                        />
+                                                        <QRCodeSVG value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads`} size={120} level="L" includeMargin={false} />
                                                     </div>
                                                     <div className="text-center">
                                                         <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
@@ -526,8 +434,8 @@ export default function ViewInvoicePage() {
                                             )}
                                         </div>
 
-                                        {/* Calculations Container (Bottom Right) */}
-                                        <div className="w-[300px]">
+                                        {/* Totals */}
+                                        <div className="min-w-[260px]">
                                             <div className="space-y-4">
                                                 <div className="flex justify-between text-sm py-1">
                                                     <span className="text-[var(--muted)]">Subtotal</span>
@@ -537,7 +445,6 @@ export default function ViewInvoicePage() {
                                                     <span className="text-[var(--muted)]">GST ({invoice.gstPercent}%)</span>
                                                     <span className="font-medium text-[var(--foreground)]">{invoice.currency} {invoice.gstAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                 </div>
-
                                                 <div className="flex justify-between items-center bg-[var(--muted-bg)] p-4 rounded-xl border border-[var(--border)] mt-4 shadow-inner">
                                                     <span className="text-[var(--foreground)] font-bold">Total Due</span>
                                                     <span className="text-xl font-heading font-black text-blue-500 tracking-tight">
@@ -546,16 +453,32 @@ export default function ViewInvoicePage() {
                                                 </div>
                                             </div>
 
-                                            {invoice.status === 'paid' && (
-                                                <div className="mt-8 flex items-center justify-end gap-2 text-emerald-500 font-bold uppercase tracking-widest text-sm border-2 border-emerald-500/20 bg-emerald-500/5 px-4 py-3 rounded-lg rotate-[-2deg] max-w-fit ml-auto shadow-sm">
-                                                    <CheckCircle2 className="w-5 h-5" />
-                                                    PAID IN FULL
+                                            {/* PAID rubber stamp seal */}
+                                            {isPaid && (
+                                                <div className="mt-8 flex justify-end">
+                                                    <div
+                                                        className="relative flex items-center justify-center"
+                                                        style={{ transform: 'rotate(-12deg)', width: '110px', height: '110px' }}
+                                                    >
+                                                        {/* Outer ring */}
+                                                        <div className="absolute inset-0 rounded-full border-4 border-emerald-500 opacity-90" />
+                                                        {/* Inner ring */}
+                                                        <div className="absolute inset-[8px] rounded-full border-2 border-emerald-500 opacity-60" />
+                                                        {/* Fill */}
+                                                        <div className="absolute inset-0 rounded-full bg-emerald-500/10" />
+                                                        {/* Content */}
+                                                        <div className="relative flex flex-col items-center justify-center gap-1 z-10">
+                                                            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-black text-base tracking-[0.2em] uppercase leading-none">PAID</span>
+                                                            <span className="text-emerald-600/70 dark:text-emerald-400/70 text-[9px] font-bold tracking-widest uppercase">IN FULL</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
 
-                                    {/* Footer Warning */}
+                                    {/* Footer note */}
                                     <div className="mt-16 text-center">
                                         <p className="text-xs text-[var(--muted)] uppercase tracking-wider font-semibold opacity-60">
                                             This is a computer-generated document. No signature is required.

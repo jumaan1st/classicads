@@ -25,6 +25,7 @@ export interface Invoice {
   total: number;
   currency: string;
   items: InvoiceItem[];
+  serviceIds: string[];
   pdfUrl?: string;
 }
 
@@ -44,10 +45,11 @@ const DUMMY_INVOICES: Invoice[] = [
     gstAmount: 11055,
     total: 72470,
     currency: "INR",
+    serviceIds: ["1", "6"],
     items: [
-      { description: "Living room design & consultation", quantity: 1, unitPrice: 15000, amount: 15000 },
-      { description: "Furniture & upholstery", quantity: 1, unitPrice: 35000, amount: 35000 },
-      { description: "Lighting & accessories", quantity: 1, unitPrice: 11415, amount: 11415 },
+      { description: "Living Room Design", quantity: 1, unitPrice: 45000, amount: 45000 },
+      { description: "Design Consultation", quantity: 1, unitPrice: 8000, amount: 8000 },
+      { description: "Accessories & Logistics", quantity: 1, unitPrice: 8415, amount: 8415 },
     ],
   },
   {
@@ -65,10 +67,10 @@ const DUMMY_INVOICES: Invoice[] = [
     gstAmount: 14492,
     total: 95000,
     currency: "INR",
+    serviceIds: ["4", "5"],
     items: [
-      { description: "Exterior surface preparation", quantity: 1, unitPrice: 15000, amount: 15000 },
-      { description: "Premium exterior paint (2 coats)", quantity: 1, unitPrice: 45508, amount: 45508 },
-      { description: "Trim & detailing", quantity: 1, unitPrice: 20000, amount: 20000 },
+      { description: "Facade & Exterior Paint", quantity: 1, unitPrice: 55508, amount: 55508 },
+      { description: "Landscape Design", quantity: 1, unitPrice: 25000, amount: 25000 },
     ],
   },
   {
@@ -86,10 +88,32 @@ const DUMMY_INVOICES: Invoice[] = [
     gstAmount: 27458,
     total: 180000,
     currency: "INR",
+    serviceIds: ["2", "6", "7"],
     items: [
-      { description: "Kitchen design & 3D render", quantity: 1, unitPrice: 25000, amount: 25000 },
-      { description: "Cabinetry & countertops", quantity: 1, unitPrice: 97542, amount: 97542 },
-      { description: "Appliances & installation", quantity: 1, unitPrice: 30000, amount: 30000 },
+      { description: "Kitchen Renovation", quantity: 1, unitPrice: 97542, amount: 97542 },
+      { description: "Bathroom Remodeling", quantity: 1, unitPrice: 30000, amount: 30000 },
+      { description: "Design Consultation", quantity: 1, unitPrice: 25000, amount: 25000 },
+    ],
+  },
+  {
+    id: "INV4",
+    invoiceNumber: "INV-2025-004",
+    projectId: "P4",
+    projectTitle: "Corporate HQ Fitout",
+    clientName: "Priya Sharma",
+    clientEmail: "priya.s@globalcorp.in",
+    issueDate: "2025-03-01",
+    dueDate: "2025-03-31",
+    status: "overdue",
+    subtotal: 296610,
+    gstPercent: 18,
+    gstAmount: 53390,
+    total: 350000,
+    currency: "INR",
+    serviceIds: ["8", "6"],
+    items: [
+      { description: "Commercial Office Design", quantity: 1, unitPrice: 275000, amount: 275000 },
+      { description: "Design Consultation", quantity: 1, unitPrice: 21610, amount: 21610 },
     ],
   },
 ];
