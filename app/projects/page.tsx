@@ -2,6 +2,7 @@ import ProjectsClient from "@/components/ProjectsClient";
 import { db } from "@/db";
 import { projects, projectMilestones, projectPhotos, projectServices, projectAssignments, users, services } from "@/db/schema";
 import { eq, inArray, desc } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 type Service = { id: string; name: string };
 type Project = {
   id: string;
@@ -17,8 +18,7 @@ type Project = {
   progressPhotos?: { url: string }[];
 };
 
-export const dynamic = 'force-dynamic';
-export default async function ProjectsPage() {
+const getProjectsData = unstable_cache(async () => {
   // Fetch initial projects directly from DB
   const rawProjects = await db
     .select()
@@ -94,6 +94,12 @@ export default async function ProjectsPage() {
     initialServicesMap[s.id] = s.name;
   });
 
+  return { initialProjects, initialServicesMap };
+}, ['projects-page-data'], { revalidate: 60, tags: ['projects'] });
+
+export const dynamic = 'force-dynamic';
+export default async function ProjectsPage() {
+  const { initialProjects, initialServicesMap } = await getProjectsData();
   return (
     <ProjectsClient
       initialProjects={initialProjects}

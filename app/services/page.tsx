@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { services, serviceGallery } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
 import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
+import { unstable_cache } from "next/cache";
 type Service = {
   id: string;
   name: string;
@@ -15,14 +16,7 @@ type Service = {
   featured: boolean;
 };
 
-export const dynamic = 'force-dynamic';
-export default async function ServicesPage() {
-  // 1. Fetch Page Content
-  const content = getPageBySlug("services") as PageContent | null;
-  const initialContent = content?.slug
-    ? { title: content.title, description: content.description }
-    : null;
-
+const getServicesData = unstable_cache(async () => {
   // 2. Fetch Services from DB directly
   const rawServices = await db
     .select()
@@ -59,6 +53,19 @@ export default async function ServicesPage() {
       gallery: galleryUrls
     } as Service;
   });
+
+  return { initialServices };
+}, ['services-page-data'], { revalidate: 60, tags: ['services'] });
+
+export const dynamic = 'force-dynamic';
+export default async function ServicesPage() {
+  // 1. Fetch Page Content
+  const content = getPageBySlug("services") as PageContent | null;
+  const initialContent = content?.slug
+    ? { title: content.title, description: content.description }
+    : null;
+
+  const { initialServices } = await getServicesData();
 
   return (
     <ServicesClient

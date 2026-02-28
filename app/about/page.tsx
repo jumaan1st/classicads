@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { businessProfile, projects } from "@/db/schema";
 import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
 import { sql } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 type Profile = {
   ownerName?: string | null;
   shopName?: string | null;
@@ -38,15 +39,20 @@ function yearsOfExp(startedAt?: string | null): string {
   return `${years}+`;
 }
 
-export const dynamic = 'force-dynamic';
-export default async function AboutPage() {
-  const content = getPageBySlug("about") as PageContent | null;
-
+const getAboutData = unstable_cache(async () => {
   const profileRows = await db.select().from(businessProfile).limit(1);
   const profile = profileRows[0] as Profile | undefined;
 
   const projectCountRow = await db.select({ count: sql<number>`count(*)` }).from(projects);
   const totalProjects = Number(projectCountRow[0]?.count || 0);
+
+  return { profile, totalProjects };
+}, ['about-page-data'], { revalidate: 60, tags: ['about'] });
+
+export const dynamic = 'force-dynamic';
+export default async function AboutPage() {
+  const content = getPageBySlug("about") as PageContent | null;
+  const { profile, totalProjects } = await getAboutData();
 
   const stats = [
     { value: totalProjects > 0 ? `${totalProjects}+` : "10+", label: "Projects Delivered" },

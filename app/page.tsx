@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { businessProfile, projects, services, projectPhotos } from "@/db/schema";
 import { eq, desc, sql, inArray } from "drizzle-orm";
 import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
+import { unstable_cache } from "next/cache";
 
 type Service = {
   id: string;
@@ -37,10 +38,7 @@ type HomeResponse = {
   };
 };
 
-export const dynamic = 'force-dynamic';
-export default async function Home() {
-  const page = getPageBySlug("home") as PageContent | null;
-
+const getHomePageData = unstable_cache(async () => {
   const profileRows = await db.select().from(businessProfile).limit(1);
   const profile = profileRows[0];
 
@@ -79,6 +77,14 @@ export default async function Home() {
       image: pP.length > 0 ? pP[0].url : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070",
     };
   });
+
+  return { profile, totalProjects, yearsOfExperience, serviceList, projectList };
+}, ['home-page-data'], { revalidate: 60, tags: ['home'] });
+
+export const dynamic = 'force-dynamic';
+export default async function Home() {
+  const page = getPageBySlug("home") as PageContent | null;
+  const { profile, totalProjects, yearsOfExperience, serviceList, projectList } = await getHomePageData();
 
   const mapData = {
     mapEmbedUrl: profile?.mapEmbedUrl || "",
