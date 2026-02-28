@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Card from "@/components/Card";
+import { Pencil, Trash2, X, User, Mail, Phone, MapPin, FileText, Calendar } from "lucide-react";
 
 type Customer = {
   id: string;
@@ -16,9 +17,17 @@ type Customer = {
 export default function DashboardCustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [formOpen, setFormOpen] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", notes: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    notes: "",
+  });
 
   const load = () => {
     fetch("/api/customers")
@@ -29,26 +38,62 @@ export default function DashboardCustomersPage() {
 
   useEffect(() => load(), []);
 
+  const resetForm = () => {
+    setForm({ name: "", email: "", phone: "", address: "", notes: "" });
+    setEditingId(null);
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setModalOpen(true);
+  };
+
+  const openEditModal = (customer: Customer) => {
+    setForm({
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address || "",
+      notes: customer.notes || "",
+    });
+    setEditingId(customer.id);
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await fetch("/api/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      setForm({ name: "", email: "", phone: "", address: "", notes: "" });
-      setFormOpen(false);
+      if (editingId) {
+        await fetch(`/api/customers/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      } else {
+        await fetch("/api/customers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      }
+      setModalOpen(false);
+      resetForm();
       load();
     } finally {
       setSaving(false);
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this customer?")) return;
+    await fetch(`/api/customers/${id}`, { method: "DELETE" });
+    load();
+  };
+
   if (loading) {
     return (
-      <div>
+      <div className="space-y-6">
         <div className="h-8 w-48 animate-pulse rounded bg-[var(--muted-bg)]" />
         <div className="mt-6 h-64 animate-pulse rounded-2xl bg-[var(--muted-bg)]" />
       </div>
@@ -57,128 +102,250 @@ export default function DashboardCustomersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-col gap-2">
-          <h1 className="font-heading text-3xl font-bold text-[var(--foreground)] tracking-tight">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="font-heading text-2xl sm:text-3xl font-bold text-[var(--foreground)]">
             Customers
           </h1>
-          <p className="text-[var(--muted)] text-sm">
+          <p className="text-[var(--muted)] text-sm mt-0.5">
             Store and manage customer details. Admin only.
           </p>
         </div>
         <button
-          type="button"
-          onClick={() => setFormOpen(!formOpen)}
-          className="rounded-lg bg-[var(--button)] px-4 py-2.5 text-[15px] font-semibold text-[var(--button-text)] hover:bg-[var(--button-hover)]"
+          onClick={openCreateModal}
+          className="w-full sm:w-auto rounded-lg bg-[var(--button)] px-4 py-2.5 text-sm font-semibold text-[var(--button-text)] hover:bg-[var(--button-hover)] transition-colors"
         >
-          {formOpen ? "Cancel" : "Add customer"}
+          + Add customer
         </button>
       </div>
 
-      {formOpen && (
-        <Card className="p-6 sm:p-8 bg-[var(--card)]/80 backdrop-blur-md border border-[var(--border)] shadow-md">
-          <h2 className="font-heading text-xl font-bold text-[var(--foreground)]">
-            New Customer
-          </h2>
-          <form onSubmit={handleSubmit} className="mt-6 grid gap-5 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Name *</label>
-              <input
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
-                placeholder="John Doe"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Email *</label>
-              <input
-                required
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
-                placeholder="john@example.com"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Phone</label>
-              <input
-                value={form.phone}
-                onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
-                placeholder="+1 234 567 890"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Address</label>
-              <input
-                value={form.address}
-                onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all"
-                placeholder="123 Main St"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold text-[var(--muted)] mb-1.5">Notes</label>
-              <textarea
-                rows={3}
-                value={form.notes}
-                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                className="w-full rounded-xl border border-[var(--border)] bg-[var(--muted-bg)]/50 px-4 py-3 text-[var(--foreground)] focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 outline-none transition-all resize-none"
-                placeholder="Any additional details..."
-              />
-            </div>
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded-xl bg-[var(--foreground)] px-6 py-3 text-sm font-bold text-[var(--background)] hover:opacity-90 disabled:opacity-50 transition-all shadow-md"
-              >
-                {saving ? "Saving…" : "Save Customer"}
-              </button>
-            </div>
-          </form>
+      {customers.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center py-16 text-center bg-[var(--card)]/90 border border-[var(--border)]">
+          <User size={40} className="text-[var(--muted)] mb-3 opacity-40" />
+          <p className="text-[var(--foreground)] font-semibold">No customers yet</p>
+          <p className="text-[var(--muted)] text-sm mt-1">Add your first customer to get started.</p>
         </Card>
+      ) : (
+        <>
+          {/* Desktop / Tablet Table — hidden on mobile */}
+          <Card className="hidden sm:block overflow-hidden bg-[var(--card)]/90 border border-[var(--border)] shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] bg-[var(--muted-bg)]/50 text-xs uppercase font-semibold tracking-wide text-[var(--muted)]">
+                    <th className="p-4">Name</th>
+                    <th className="p-4">Email</th>
+                    <th className="p-4 hidden lg:table-cell">Phone</th>
+                    <th className="p-4 hidden xl:table-cell">Address</th>
+                    <th className="p-4 hidden xl:table-cell">Notes</th>
+                    <th className="p-4 hidden md:table-cell">Added</th>
+                    <th className="p-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {customers.map((c) => (
+                    <tr key={c.id} className="hover:bg-blue-500/5 transition-colors">
+                      <td className="p-4 font-medium text-[var(--foreground)]">{c.name}</td>
+                      <td className="p-4 text-[var(--muted)]">{c.email}</td>
+                      <td className="p-4 hidden lg:table-cell text-[var(--muted)]">{c.phone || "—"}</td>
+                      <td className="p-4 hidden xl:table-cell text-[var(--muted)] max-w-[160px] truncate">{c.address || "—"}</td>
+                      <td className="p-4 hidden xl:table-cell text-[var(--muted)] max-w-[160px] truncate">{c.notes || "—"}</td>
+                      <td className="p-4 hidden md:table-cell text-xs text-[var(--muted)]">
+                        {new Date(c.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={() => openEditModal(c)}
+                            className="text-blue-500 hover:text-blue-600 transition-colors"
+                            aria-label="Edit customer"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(c.id)}
+                            className="text-red-500 hover:text-red-600 transition-colors"
+                            aria-label="Delete customer"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          {/* Mobile Cards — visible only on mobile */}
+          <div className="flex flex-col gap-3 sm:hidden">
+            {customers.map((c) => (
+              <Card
+                key={c.id}
+                className="bg-[var(--card)]/90 border border-[var(--border)] shadow-sm p-4 space-y-3"
+              >
+                {/* Card Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex-shrink-0 w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center">
+                      <span className="text-blue-500 font-bold text-sm">
+                        {c.name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--foreground)] truncate">{c.name}</p>
+                      <p className="text-xs text-[var(--muted)] truncate">{c.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => openEditModal(c)}
+                      className="text-blue-500 hover:text-blue-600 p-1 transition-colors"
+                      aria-label="Edit customer"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(c.id)}
+                      className="text-red-500 hover:text-red-600 p-1 transition-colors"
+                      aria-label="Delete customer"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Card Details */}
+                <div className="grid grid-cols-2 gap-2 text-sm border-t border-[var(--border)] pt-3">
+                  {c.phone && (
+                    <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                      <Phone size={12} className="flex-shrink-0" />
+                      <span className="truncate">{c.phone}</span>
+                    </div>
+                  )}
+                  {c.address && (
+                    <div className="flex items-center gap-1.5 text-[var(--muted)]">
+                      <MapPin size={12} className="flex-shrink-0" />
+                      <span className="truncate">{c.address}</span>
+                    </div>
+                  )}
+                  {c.notes && (
+                    <div className="col-span-2 flex items-start gap-1.5 text-[var(--muted)]">
+                      <FileText size={12} className="flex-shrink-0 mt-0.5" />
+                      <span className="line-clamp-2 text-xs">{c.notes}</span>
+                    </div>
+                  )}
+                  <div className="col-span-2 flex items-center gap-1.5 text-[var(--muted)] text-xs">
+                    <Calendar size={11} className="flex-shrink-0" />
+                    <span>Added {new Date(c.createdAt).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
-      <Card className="overflow-hidden bg-[var(--card)]/90 backdrop-blur-xl border border-[var(--border)] shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] bg-[var(--muted-bg)]/50 text-[var(--muted)] text-xs uppercase tracking-wider font-semibold">
-                <th className="p-4 sm:px-6">Name</th>
-                <th className="p-4 sm:px-6">Email</th>
-                <th className="p-4 sm:px-6">Phone</th>
-                <th className="p-4 sm:px-6">Address</th>
-                <th className="p-4 sm:px-6 hidden md:table-cell">Notes</th>
-                <th className="p-4 sm:px-6">Added</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border)]">
-              {customers.map((c) => (
-                <tr
-                  key={c.id}
-                  className="hover:bg-blue-500/5 transition-colors group"
+      {/* Modal */}
+      {modalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn p-0 sm:p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
+        >
+          <div className="w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl bg-[var(--card)] p-6 sm:p-8 shadow-xl max-h-[90dvh] overflow-y-auto">
+            {/* Drag handle for mobile */}
+            <div className="sm:hidden w-10 h-1 rounded-full bg-[var(--border)] mx-auto mb-5" />
+
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg sm:text-xl font-bold text-[var(--foreground)]">
+                {editingId ? "Update Customer" : "New Customer"}
+              </h2>
+              <button
+                onClick={() => setModalOpen(false)}
+                className="text-[var(--muted)] hover:text-[var(--foreground)] transition-colors p-1"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="relative">
+                <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  required
+                  placeholder="Name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  required
+                  type="email"
+                  placeholder="Email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  placeholder="Phone"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <MapPin size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  placeholder="Address"
+                  value={form.address}
+                  onChange={(e) => setForm({ ...form, address: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <FileText size={15} className="absolute left-3.5 top-3.5 text-[var(--muted)] pointer-events-none" />
+                <textarea
+                  rows={3}
+                  placeholder="Notes"
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 resize-none text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(false)}
+                  className="flex-1 rounded-xl border border-[var(--border)] px-6 py-3 text-sm font-semibold text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--muted-bg)] transition-colors"
                 >
-                  <td className="p-4 sm:px-6 font-medium text-[var(--foreground)] group-hover:text-blue-400 transition-colors">{c.name}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.email}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.phone || "—"}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)]">{c.address || "—"}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)] max-w-xs truncate hidden md:table-cell">{c.notes || "—"}</td>
-                  <td className="p-4 sm:px-6 text-[var(--muted)] text-xs font-medium tracking-wider uppercase">
-                    {new Date(c.createdAt).toLocaleDateString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 rounded-xl bg-[var(--foreground)] px-6 py-3 text-sm font-bold text-[var(--background)] disabled:opacity-60 transition-opacity"
+                >
+                  {saving ? "Saving…" : editingId ? "Update" : "Save"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-        {customers.length === 0 && !formOpen && (
-          <p className="p-8 text-center text-[var(--muted)]">No customers yet. Add one above.</p>
-        )}
-      </Card>
+      )}
     </div>
   );
 }

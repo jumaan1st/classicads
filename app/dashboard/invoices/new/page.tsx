@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import {
     ArrowLeft, ArrowRight, Save, Check, X,
     Building2, FileText, CheckCircle2, IndianRupee,
-    Plus, Trash2, ToggleLeft, ToggleRight
+    Plus, Trash2, ToggleLeft, ToggleRight, Search,
 } from "lucide-react";
 import Card from "@/components/Card";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,14 @@ type MiscItem = {
     id: string;
     name: string;
     amount: string;
+};
+
+type CustomerSuggestion = {
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    notes?: string | null;
 };
 
 type FormData = {
@@ -63,11 +71,23 @@ export default function CreateInvoicePage() {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [loading, setLoading] = useState(false);
     const [servicesLoading, setServicesLoading] = useState(true);
+    const [saveLoading, setSaveLoading] = useState(false);
+
     const [availableServices, setAvailableServices] = useState<Service[]>([]);
     const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
     const [miscItems, setMiscItems] = useState<MiscItem[]>([{ id: "m0", name: "", amount: "" }]);
     const [markedPaid, setMarkedPaid] = useState(false);
+
     const amountRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+    // Customer search state
+    const [customerQuery, setCustomerQuery] = useState("");
+    const [customerSuggestions, setCustomerSuggestions] = useState<CustomerSuggestion[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+    const [initialCustomers, setInitialCustomers] = useState<CustomerSuggestion[]>([]);
+
+    const comboboxRef = useRef<HTMLDivElement>(null);
 
     const [formData, setFormData] = useState<FormData>({
         clientName: "",
@@ -87,8 +107,92 @@ export default function CreateInvoicePage() {
             .finally(() => setServicesLoading(false));
     }, []);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-        setFormData({ ...formData, [e.target.name]: e.target.value });
+    // Load initial 10 customers
+    useEffect(() => {
+        fetch("/api/customers?limit=10")
+            .then((r) => r.json())
+            .then((data) => {
+                if (data.customers) {
+                    setInitialCustomers(data.customers);
+                    setCustomerSuggestions(data.customers);
+                }
+            })
+            .catch(console.error);
+    }, []);
+
+    // Click outside → hide dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Live filtering + backend fallback when few matches
+    const filterAndSearch = useCallback(async (query: string) => {
+        if (!query.trim()) {
+            setCustomerSuggestions(initialCustomers);
+            setShowSuggestions(false);
+            return;
+        }
+
+        const q = query.toLowerCase().trim();
+        const filtered = initialCustomers.filter(
+            (c) =>
+                c.name.toLowerCase().includes(q) ||
+                (c.email && c.email.toLowerCase().includes(q)) ||
+                (c.phone && c.phone.toLowerCase().includes(q))
+        );
+
+        setCustomerSuggestions(filtered);
+        setShowSuggestions(true);
+
+        // If very few matches left → ask backend for more
+        if (filtered.length <= 3) {
+            try {
+                const res = await fetch(`/api/customers?query=${encodeURIComponent(q)}&limit=12`);
+                const data = await res.json();
+                if (data.customers) {
+                    const newOnes = data.customers.filter(
+                        (c: CustomerSuggestion) => !initialCustomers.some((ic) => ic.id === c.id)
+                    );
+                    setInitialCustomers((prev) => [...prev, ...newOnes]);
+                    setCustomerSuggestions((prev) => [...prev, ...newOnes]);
+                }
+            } catch (err) {
+                console.error("Customer search failed", err);
+            }
+        }
+    }, [initialCustomers]);
+
+    useEffect(() => {
+        filterAndSearch(customerQuery);
+    }, [customerQuery, filterAndSearch]);
+
+    const selectCustomer = (cust: CustomerSuggestion) => {
+        setFormData({
+            ...formData,
+            clientName: cust.name,
+            clientEmail: cust.email || "",
+            clientNumber: cust.phone || "",
+            clientGst: cust.notes?.includes("GST:") ? cust.notes.replace("GST: ", "").trim() : "",
+        });
+        setSelectedCustomerId(cust.id);
+        setCustomerQuery(cust.name);
+        setShowSuggestions(false);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData({ ...formData, [name]: value });
+        if (name === "clientName") {
+            setSelectedCustomerId(null);
+            setCustomerQuery(value);
+        }
+    };
 
     // ── Service card toggle ──────────────────────────────────────────────────
     const toggleService = (service: Service) => {
@@ -151,10 +255,125 @@ export default function CreateInvoicePage() {
     const hasValidMisc = miscItems.some((m) => m.name.trim() && m.amount);
     const canStep2 = hasValidService || hasValidMisc;
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setTimeout(() => { setLoading(false); router.push("/dashboard/invoices"); }, 1000);
+        if (saveLoading) return;
+        setSaveLoading(true);
+
+        try {
+            let customerId = selectedCustomerId;
+
+            // 1. Create or update customer
+            if (!customerId) {
+                // Try to find existing customer
+                let lookupRes = await fetch(`/api/customers?query=${encodeURIComponent(
+                    formData.clientEmail || formData.clientNumber || formData.clientName
+                )}`);
+                let lookupData = await lookupRes.json();
+
+                let existing = null;
+                if (lookupData.customers?.length > 0) {
+                    existing = lookupData.customers.find((c: any) =>
+                        (formData.clientEmail && c.email === formData.clientEmail) ||
+                        (formData.clientNumber && c.phone === formData.clientNumber)
+                    ) || lookupData.customers[0];
+                }
+
+                if (existing) {
+                    // Update
+                    await fetch("/api/customers", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            id: existing.id,
+                            name: formData.clientName,
+                            email: formData.clientEmail || existing.email,
+                            phone: formData.clientNumber || existing.phone,
+                            gst: formData.clientGst || "",
+                        }),
+                    });
+                    customerId = existing.id;
+                } else {
+                    // Create new
+                    const createRes = await fetch("/api/customers", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            name: formData.clientName,
+                            email: formData.clientEmail || null,
+                            phone: formData.clientNumber || null,
+                            address: null,
+                            notes: formData.clientGst ? `GST: ${formData.clientGst}` : null,
+                        }),
+                    });
+                    const { customer } = await createRes.json();
+                    customerId = customer.id;
+                }
+            }
+
+            if (!customerId) {
+                alert("Could not create or find customer");
+                return;
+            }
+
+            // 2. Create invoice
+            const payload = {
+                customerId,
+                projectTitle: formData.projectTitle,
+                issueDate: formData.issueDate,
+                dueDate: formData.dueDate || null,
+                gstPercent: formData.gstPercent,
+                subtotal: subtotal.toFixed(2),
+                gstAmount: gstAmt.toFixed(2),
+                total: total.toFixed(2),
+                status: markedPaid ? "paid" : "draft",
+                items: [
+                    ...selectedServices.map((s) => ({
+                        description: s.name + (s.description ? ` - ${s.description}` : ""),
+                        quantity: 1,
+                        unitPrice: parseFloat(s.amount) || 0,
+                        amount: parseFloat(s.amount) || 0,
+                        type: s.isCustom ? "miscellaneous" : "service",
+                        serviceId: s.isCustom ? null : s.serviceId,
+                    })),
+                    ...miscItems
+                        .filter((m) => m.name.trim() && m.amount.trim())
+                        .map((m) => ({
+                            description: m.name,
+                            quantity: 1,
+                            unitPrice: parseFloat(m.amount) || 0,
+                            amount: parseFloat(m.amount) || 0,
+                            type: "miscellaneous",
+                            serviceId: null,
+                        })),
+                ],
+            };
+
+            const res = await fetch("/api/invoices", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || "Failed to create invoice");
+            }
+
+            const data = await res.json();
+            const createdInvoiceId = data.invoice?.id;
+
+            if (createdInvoiceId) {
+                router.push("/dashboard/invoices");
+            } else {
+                alert("Invoice created but could not redirect");
+            }
+        } catch (err: any) {
+            console.error("Save failed:", err);
+            alert(err.message || "Error while saving invoice");
+        } finally {
+            setSaveLoading(false);
+        }
     };
 
     const invoiceNumber = `INV-2025-${String(Math.floor(Math.random() * 900) + 100)}`;
@@ -222,8 +441,48 @@ export default function CreateInvoicePage() {
                             <h2 className="text-xl font-heading font-bold text-[var(--foreground)]">Client Details</h2>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            {/* ── Client Name with search ─────── */}
+                            <div className="space-y-2 relative" ref={comboboxRef}>
+                                <label className="text-sm font-medium text-[var(--foreground)]">Client Name *</label>
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        name="clientName"
+                                        value={customerQuery}
+                                        onChange={(e) => {
+                                            setCustomerQuery(e.target.value);
+                                            handleChange(e);
+                                        }}
+                                        onFocus={() => setShowSuggestions(true)}
+                                        placeholder="Search or type new client name..."
+                                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors pl-10"
+                                        required
+                                    />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
+                                </div>
+
+                                {showSuggestions && customerSuggestions.length > 0 && (
+                                    <ul className="absolute z-10 w-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg max-h-60 overflow-auto">
+                                        {customerSuggestions.map((cust) => (
+                                            <li key={cust.id}>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => selectCustomer(cust)}
+                                                    className="w-full text-left px-4 py-2.5 hover:bg-[var(--muted-bg)] transition-colors"
+                                                >
+                                                    <div className="font-medium">{cust.name}</div>
+                                                    <div className="text-xs text-[var(--muted)]">
+                                                        {cust.email || cust.phone || "No contact"}
+                                                    </div>
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+
+                            {/* Email, Phone, GST */}
                             {[
-                                { label: "Client Name *", name: "clientName", type: "text", placeholder: "e.g. John Doe", required: true },
                                 { label: "Email (Optional)", name: "clientEmail", type: "email", placeholder: "e.g. john@example.com" },
                                 { label: "Phone (Optional)", name: "clientNumber", type: "text", placeholder: "e.g. +91 98765 43210" },
                                 { label: "GST Number (Optional)", name: "clientGst", type: "text", placeholder: "e.g. 29ABCDE1234F1Z5" },
@@ -231,7 +490,6 @@ export default function CreateInvoicePage() {
                                 <div key={f.name} className="space-y-2">
                                     <label className="text-sm font-medium text-[var(--foreground)]">{f.label}</label>
                                     <input type={f.type} name={f.name} value={formData[f.name as keyof FormData]} onChange={handleChange}
-                                        required={f.required}
                                         className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors"
                                         placeholder={f.placeholder} />
                                 </div>
@@ -694,14 +952,13 @@ export default function CreateInvoicePage() {
 
                     <div className="flex justify-end gap-3 sm:gap-4 flex-wrap">
                         <button type="button" onClick={() => setStep(2)} className="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-[var(--border)] text-[var(--foreground)] font-semibold hover:bg-[var(--muted-bg)] transition-colors text-sm sm:text-base">Back</button>
-                        <button type="submit" disabled={loading}
-                            onClick={() => { /* Real app would pass "draft" here */ }}
+                        <button type="submit" disabled={saveLoading}
                             className="px-5 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] font-semibold hover:bg-[var(--muted-bg)] transition-colors disabled:opacity-50 text-sm sm:text-base">
-                            {loading ? "Saving..." : "Save as Draft"}
+                            {saveLoading ? "Saving..." : "Save as Draft"}
                         </button>
-                        <button type="submit" disabled={loading}
+                        <button type="submit" disabled={saveLoading}
                             className={`flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition-all duration-300 disabled:opacity-50 text-sm sm:text-base ${markedPaid ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"}`}>
-                            {loading ? "Saving..." : <><Save className="w-5 h-5" /> Save {markedPaid ? "as Paid" : "& Send"}</>}
+                            {saveLoading ? "Saving..." : <><Save className="w-5 h-5" /> Save {markedPaid ? "as Paid" : "& Send"}</>}
                         </button>
                     </div>
                 </form>

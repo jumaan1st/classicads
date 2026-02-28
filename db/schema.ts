@@ -123,3 +123,84 @@ export const projectPhotos = pgTable('project_photos', {
     caption: text('caption'),
     uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
 });
+
+export const customers = pgTable('customers', {
+    id: uuid('id').primaryKey().defaultRandom(),
+
+    name: varchar('name', { length: 255 }).notNull(),
+    email: varchar('email', { length: 255 }),
+    phone: varchar('phone', { length: 50 }),
+    address: text('address'),
+    notes: text('notes'),
+
+    isDeleted: boolean('is_deleted').default(false).notNull(),
+    deletedAt: timestamp('deleted_at'),
+
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const invoices = pgTable("invoices", {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    invoiceNumber: varchar("invoice_number", { length: 50 })
+        .notNull()
+        .unique(),
+
+    // Mandatory mapping to customer
+    customerId: uuid("customer_id")
+        .references(() => customers.id, { onDelete: "restrict" })
+        .notNull(),
+
+    // Optional hard-coded project reference (NOT linked to projects table)
+    projectTitle: varchar("project_title", { length: 255 }),
+    projectDescription: text("project_description"),
+
+    status: varchar("status", { length: 20 })
+        .default("draft") // draft | sent | paid | overdue
+        .notNull(),
+
+    issueDate: timestamp("issue_date").notNull(),
+    dueDate: timestamp("due_date").notNull(),
+
+    subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+    gstPercent: decimal("gst_percent", { precision: 5, scale: 2 }).notNull(),
+    gstAmount: decimal("gst_amount", { precision: 12, scale: 2 }).notNull(),
+    total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+
+    notes: varchar("notes", { length: 500 }),
+
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    deletedAt: timestamp("deleted_at"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const invoiceItems = pgTable("invoice_items", {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    invoiceId: uuid("invoice_id")
+        .references(() => invoices.id, { onDelete: "cascade" })
+        .notNull(),
+
+    // 🔗 Optional: only if it is an actual stored service
+    serviceId: uuid("service_id")
+        .references(() => services.id, { onDelete: "set null" }),
+
+    // Required for BOTH service + custom
+    description: text("description").notNull(),
+
+    quantity: integer("quantity").default(1).notNull(),
+
+    unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
+
+    amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+
+    type: varchar("type", { length: 20 })
+        .default("service") // service | miscellaneous
+        .notNull(),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
