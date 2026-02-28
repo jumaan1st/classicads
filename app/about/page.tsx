@@ -38,6 +38,7 @@ function yearsOfExp(startedAt?: string | null): string {
   return `${years}+`;
 }
 
+export const dynamic = 'force-dynamic';
 export default async function AboutPage() {
   const content = getPageBySlug("about") as PageContent | null;
 

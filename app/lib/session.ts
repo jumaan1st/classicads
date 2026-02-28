@@ -17,7 +17,7 @@ export async function createSession(payload: { id: string; email: string; role: 
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         expires,
-        sameSite: 'lax',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/',
     });
 }

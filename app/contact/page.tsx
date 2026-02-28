@@ -11,6 +11,7 @@ type ContactDetails = {
   shopName: string | null;
 };
 
+export const dynamic = 'force-dynamic';
 export default async function ContactPage() {
   const content = getPageBySlug("contact") as PageContent | null;
 

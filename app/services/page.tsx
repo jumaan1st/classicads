@@ -15,6 +15,7 @@ type Service = {
   featured: boolean;
 };
 
+export const dynamic = 'force-dynamic';
 export default async function ServicesPage() {
   // 1. Fetch Page Content
   const content = getPageBySlug("services") as PageContent | null;
