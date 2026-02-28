@@ -15,7 +15,7 @@ const mainNavLinks = [
   { href: "/contact", label: "Contact", icon: PhoneCall },
 ];
 
-export default function Nav() {
+export default function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -122,18 +122,29 @@ export default function Nav() {
 
             {/* Login/Dashboard - Desktop/Tablet Only */}
             <div className="hidden md:flex items-center gap-2 xl:gap-3">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-2 rounded-xl px-2 xl:px-4 py-2 text-[14px] xl:text-[15px] font-medium text-[var(--muted)] transition-smooth hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/login"
-                className="flex items-center gap-2 rounded-xl bg-blue-600 text-white px-5 py-2.5 text-[15px] font-semibold transition-smooth shadow-sm hover:bg-blue-700"
-              >
-                Login
-              </Link>
+              {isLoggedIn && (
+                <Link
+                  href="/dashboard"
+                  className="flex items-center gap-2 rounded-xl px-2 xl:px-4 py-2 text-[14px] xl:text-[15px] font-medium text-[var(--muted)] transition-smooth hover:bg-[var(--muted-bg)] hover:text-blue-600 dark:hover:text-blue-500"
+                >
+                  Dashboard
+                </Link>
+              )}
+              {isLoggedIn ? (
+                <Link
+                  href="/api/auth/logout"
+                  className="flex items-center gap-2 rounded-xl bg-red-500 text-white px-5 py-2.5 text-[15px] font-semibold transition-smooth shadow-sm hover:bg-red-600"
+                >
+                  Logout
+                </Link>
+              ) : (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-xl bg-blue-600 text-white px-5 py-2.5 text-[15px] font-semibold transition-smooth shadow-sm hover:bg-blue-700"
+                >
+                  Login
+                </Link>
+              )}
             </div>
 
             {/* Hamburger - Mobile Only */}
@@ -214,26 +225,40 @@ export default function Nav() {
               </button>
             </div>
             <ul className="flex flex-col gap-2 relative">
-              <li>
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[var(--muted)] border border-transparent hover:border-[var(--border)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)] transition-smooth"
-                  onClick={() => setOpen(false)}
-                >
-                  <LayoutDashboard className="h-5 w-5" strokeWidth={1.5} />
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/login"
-                  className="flex items-center justify-center gap-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] px-4 py-3.5 text-[15px] font-semibold transition-smooth hover:opacity-90 w-full mt-2"
-                  onClick={() => setOpen(false)}
-                >
-                  <LogIn className="h-5 w-5" strokeWidth={1.5} />
-                  Login
-                </Link>
-              </li>
+              {isLoggedIn && (
+                <li>
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-3 rounded-xl px-4 py-3.5 text-[15px] font-medium text-[var(--muted)] border border-transparent hover:border-[var(--border)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)] transition-smooth"
+                    onClick={() => setOpen(false)}
+                  >
+                    <LayoutDashboard className="h-5 w-5" strokeWidth={1.5} />
+                    Dashboard
+                  </Link>
+                </li>
+              )}
+              {isLoggedIn ? (
+                <li>
+                  <Link
+                    href="/api/auth/logout"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-red-500 text-white px-4 py-3.5 text-[15px] font-semibold transition-smooth hover:opacity-90 w-full mt-2"
+                    onClick={() => setOpen(false)}
+                  >
+                    Logout
+                  </Link>
+                </li>
+              ) : (
+                <li>
+                  <Link
+                    href="/login"
+                    className="flex items-center justify-center gap-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] px-4 py-3.5 text-[15px] font-semibold transition-smooth hover:opacity-90 w-full mt-2"
+                    onClick={() => setOpen(false)}
+                  >
+                    <LogIn className="h-5 w-5" strokeWidth={1.5} />
+                    Login
+                  </Link>
+                </li>
+              )}
             </ul>
           </div>
         </>

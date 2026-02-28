@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import MainWrap from "@/components/MainWrap";
 import FloatingContactWidget from "@/components/FloatingContactWidget";
+import { getSession } from "@/app/lib/db-session";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -33,11 +34,14 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await getSession();
+  const isLoggedIn = !!session;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -49,7 +53,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${plusJakarta.variable} min-h-screen antialiased`}>
         <ThemeProvider>
-          <Nav />
+          <Nav isLoggedIn={isLoggedIn} />
           <MainWrap>{children}</MainWrap>
           <FloatingContactWidget />
           <Footer />

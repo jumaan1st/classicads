@@ -3,8 +3,8 @@ import Image from "next/image";
 import { ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
 import MapEmbed from "@/components/MapEmbed";
 import { db } from "@/db";
-import { businessProfile, projects, services } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { businessProfile, projects, services, projectPhotos } from "@/db/schema";
+import { eq, desc, sql, inArray } from "drizzle-orm";
 import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
 
 type Service = {
@@ -62,12 +62,22 @@ export default async function Home() {
   }));
 
   const rawProjects = await db.select().from(projects).where(eq(projects.isDeleted, false)).orderBy(desc(projects.createdAt)).limit(10);
-  const projectList: Project[] = rawProjects.map((p) => ({
-    id: p.id,
-    title: p.title,
-    clientName: p.clientName || "Client",
-    image: "", // Note: To get images without N+1 requires a join, skipping for performance/simplicity since this is just a mockup array placeholder
-  }));
+  const projectIds = rawProjects.map(p => p.id);
+
+  let allPhotos: any[] = [];
+  if (projectIds.length > 0) {
+    allPhotos = await db.select().from(projectPhotos).where(inArray(projectPhotos.projectId, projectIds));
+  }
+
+  const projectList: Project[] = rawProjects.map((p) => {
+    const pP = allPhotos.filter(photo => photo.projectId === p.id);
+    return {
+      id: p.id,
+      title: p.title,
+      clientName: p.clientName || "Client",
+      image: pP.length > 0 ? pP[0].url : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070",
+    };
+  });
 
   const mapData = {
     mapEmbedUrl: profile?.mapEmbedUrl || "",

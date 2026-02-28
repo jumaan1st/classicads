@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     `;
 
         // 3. Prepare Attachments
-        const attachments = [];
+        const attachments: any[] = [];
         if (pdfData) {
             attachments.push({
                 filename: fileName || `Invoice-${invoice.invoiceNumber}.pdf`,
@@ -129,10 +129,10 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // 4. Send Email
+        // 4. Send Email Synchronously (Vercel Free Tier limits background tasks)
         await transporter.sendMail({
             from: `"${profile?.shopName || "Classic Ads"}" <${process.env.EMAIL_USER}>`,
-            to: invoice.clientEmail,
+            to: invoice.clientEmail as string,
             subject: `Invoice ${invoice.invoiceNumber} from ${profile?.shopName || "Classic Ads"}`,
             html: htmlBody,
             attachments,
