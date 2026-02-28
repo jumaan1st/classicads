@@ -79,14 +79,16 @@ export default function ClientLayout({
               <span className="text-sm font-medium text-[var(--foreground)] pr-1">{user.name}</span>
             </div>
 
-            <Link
-              href="/api/auth/logout"
-              className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-red-500/10 hover:border-red-500/20 transition-all shadow-sm"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </Link>
+            <form action="/api/auth/logout" method="POST">
+              <button
+                type="submit"
+                className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--card)] px-3 py-2 text-sm font-medium text-[var(--danger)] hover:bg-red-500/10 hover:border-red-500/20 transition-all shadow-sm"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </form>
           </div>
         </header>
 

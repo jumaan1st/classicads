@@ -131,13 +131,15 @@ export default function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
                 </Link>
               )}
               {isLoggedIn ? (
-                <Link
-                  href="/api/auth/logout"
-                  className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[15px] font-medium text-[var(--danger)] hover:bg-red-500/10 hover:border-red-500/20 transition-all shadow-sm"
-                >
-                  <LogOut className="h-[18px] w-[18px]" strokeWidth={2} />
-                  Logout
-                </Link>
+                <form action="/api/auth/logout" method="POST">
+                  <button
+                    type="submit"
+                    className="flex w-full items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] px-4 py-2 text-[15px] font-medium text-[var(--danger)] hover:bg-red-500/10 hover:border-red-500/20 transition-all shadow-sm"
+                  >
+                    <LogOut className="h-[18px] w-[18px]" strokeWidth={2} />
+                    Logout
+                  </button>
+                </form>
               ) : (
                 <Link
                   href="/login"
@@ -240,14 +242,16 @@ export default function Nav({ isLoggedIn = false }: { isLoggedIn?: boolean }) {
               )}
               {isLoggedIn ? (
                 <li>
-                  <Link
-                    href="/api/auth/logout"
-                    className="flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--card)] text-[var(--danger)] px-4 py-3.5 text-[15px] font-medium transition-all hover:bg-red-500/10 hover:border-red-500/20 shadow-sm w-full mt-2"
-                    onClick={() => setOpen(false)}
-                  >
-                    <LogOut className="h-5 w-5" strokeWidth={1.5} />
-                    Logout
-                  </Link>
+                  <form action="/api/auth/logout" method="POST" className="block w-full">
+                    <button
+                      type="submit"
+                      className="flex w-full items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--card)] px-6 py-4 text-base font-semibold text-[var(--danger)] hover:bg-red-500/10 transition-colors shadow-sm"
+                      onClick={() => setOpen(false)}
+                    >
+                      <LogOut className="h-5 w-5" strokeWidth={2} />
+                      Logout
+                    </button>
+                  </form>
                 </li>
               ) : (
                 <li>

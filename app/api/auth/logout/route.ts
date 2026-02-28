@@ -5,7 +5,7 @@ import { db } from '@/db';
 import { sessions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 
-export async function GET(request: Request) {
+export async function POST(request: Request) {
     try {
         const session = await getSession();
 
