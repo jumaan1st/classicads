@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Award, Users, Target, Sparkles, CheckCircle2, Zap, Shield, Star } from "lucide-react";
@@ -39,27 +36,26 @@ function yearsOfExp(startedAt?: string | null): string {
   return `${years}+`;
 }
 
-export default function AboutPage() {
-  const [content, setContent] = useState<PageContent | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [totalProjects, setTotalProjects] = useState<number | null>(null);
+export default async function AboutPage() {
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  useEffect(() => {
-    fetch("/api/pages?slug=about")
-      .then((r) => r.json())
-      .then((d) => (d.slug ? setContent(d) : setContent(null)))
-      .catch(() => setContent(null));
+  // Execute all server fetches concurrently for blazing fast render
+  const [contentRes, profileRes, projectsRes] = await Promise.all([
+    fetch(`${baseUrl}/api/pages?slug=about`, { next: { revalidate: 60 } }),
+    fetch(`${baseUrl}/api/profile/public`, { next: { revalidate: 60 } }),
+    fetch(`${baseUrl}/api/projects?limit=1000`, { next: { revalidate: 60 } }),
+  ]);
 
-    fetch("/api/profile/public")
-      .then((r) => r.json())
-      .then((d) => setProfile(d.profile ?? null))
-      .catch(() => setProfile(null));
+  const rawContent = contentRes.ok ? await contentRes.json() : null;
+  const content = rawContent?.slug ? (rawContent as PageContent) : null;
 
-    fetch("/api/projects?limit=1000")
-      .then((r) => r.json())
-      .then((d) => setTotalProjects(d.total ?? null))
-      .catch(() => setTotalProjects(null));
-  }, []);
+  const rawProfile = profileRes.ok ? await profileRes.json() : null;
+  const profile = (rawProfile?.profile ?? null) as Profile | null;
+
+  const rawProjects = projectsRes.ok ? await projectsRes.json() : null;
+  const totalProjects = rawProjects?.total ?? null;
 
   const stats = [
     { value: totalProjects != null ? `${totalProjects}+` : "—", label: "Projects Delivered" },

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { services, serviceGallery } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql, and, inArray, ilike } from "drizzle-orm";
 import { getSession } from "@/app/lib/db-session";
+import { revalidatePath } from "next/cache";
 
 export async function GET(request: Request) {
   try {
@@ -30,28 +31,54 @@ export async function GET(request: Request) {
       });
     }
 
-    // List fetching
-    const rawServices = await db.select().from(services).where(eq(services.isDeleted, false)).orderBy(desc(services.createdAt));
-    let allFormatted = [];
+    // List fetching & DB Pagination
+    const filterConditions = [eq(services.isDeleted, false)];
+    if (category) filterConditions.push(ilike(services.category, category));
+    if (featured === "true") filterConditions.push(eq(services.featured, true));
 
-    for (const s of rawServices) {
-      const galleryRows = await db.select().from(serviceGallery).where(eq(serviceGallery.serviceId, s.id));
-      allFormatted.push({
+    const finalCondition = and(...filterConditions);
+    const offset = (page - 1) * limit;
+
+    // Parallel DB queries for data and count
+    const [rawServices, totalResult] = await Promise.all([
+      db
+        .select()
+        .from(services)
+        .where(finalCondition)
+        .orderBy(desc(services.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(services)
+        .where(finalCondition)
+    ]);
+
+    const total = Number(totalResult[0]?.count || 0);
+
+    // Eliminate N+1 Query: Fetch all gallery images for these services simultaneously
+    const serviceIds = rawServices.map(s => s.id);
+    let allGalleryRows: any[] = [];
+    if (serviceIds.length > 0) {
+      allGalleryRows = await db
+        .select()
+        .from(serviceGallery)
+        .where(inArray(serviceGallery.serviceId, serviceIds));
+    }
+
+    const paginatedData = rawServices.map(s => {
+      const galleryUrls = allGalleryRows
+        .filter(g => g.serviceId === s.id)
+        .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+        .map(g => g.url);
+
+      return {
         ...s,
         priceRange: { min: s.minPrice, max: s.maxPrice },
         timelineWeeks: { min: s.minTimelineWeeks, max: s.maxTimelineWeeks },
-        gallery: galleryRows.map(g => g.url)
-      });
-    }
-
-    // Apply Legacy Filtering rules locally
-    if (category) allFormatted = allFormatted.filter(s => s.category === category);
-    if (featured === "true") allFormatted = allFormatted.filter(s => s.featured);
-
-    const total = allFormatted.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedData = allFormatted.slice(startIndex, endIndex);
+        gallery: galleryUrls
+      };
+    });
 
     return NextResponse.json({
       services: paginatedData,
@@ -95,6 +122,12 @@ export async function POST(request: Request) {
         }))
       );
     }
+
+    revalidatePath("/dashboard/services");
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/projects");
 
     return NextResponse.json(newService[0], { status: 201 });
   } catch (err: any) {
@@ -141,6 +174,13 @@ export async function PUT(request: Request) {
       }
     }
 
+    revalidatePath("/dashboard/services");
+    revalidatePath("/services");
+    revalidatePath(`/services/${updateData.slug}`);
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/projects");
+
     return NextResponse.json(updatedService[0]);
   } catch (err: any) {
     console.error("Service PUT error:", err);
@@ -169,6 +209,12 @@ export async function DELETE(request: Request) {
       deletedAt: new Date(),
       slug: newSlug
     }).where(eq(services.id, id));
+
+    revalidatePath("/dashboard/services");
+    revalidatePath("/services");
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/projects");
 
     return NextResponse.json({ success: true, message: "Service successfully deleted." });
   } catch (err: any) {

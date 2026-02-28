@@ -36,13 +36,25 @@ export default function InvoicesPage() {
   const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
 
-  useEffect(() => {
-    fetch("/api/invoices")
+  const load = (currentPage: number = 1) => {
+    setLoading(true);
+    fetch(`/api/invoices?page=${currentPage}&limit=${limit}`)
       .then((r) => r.json())
-      .then((d) => setInvoices(d.invoices ?? []))
+      .then((d) => {
+        setInvoices(d.invoices ?? []);
+        if (d.pagination) {
+          setTotalPages(d.pagination.pages);
+          setPage(d.pagination.current);
+        }
+      })
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { load(1); }, []);
 
   if (loading) {
     return (
@@ -79,7 +91,6 @@ export default function InvoicesPage() {
                 <th className="p-4 sm:px-6">Invoice</th>
                 <th className="p-4 sm:px-6">Project</th>
                 <th className="p-4 sm:px-6">Client</th>
-                <th className="p-4 sm:px-6 hidden md:table-cell">Services</th>
                 <th className="p-4 sm:px-6">Due</th>
                 <th className="p-4 sm:px-6">Status</th>
                 <th className="p-4 sm:px-6">Total</th>
@@ -88,9 +99,6 @@ export default function InvoicesPage() {
             </thead>
             <tbody className="divide-y divide-[var(--border)]">
               {invoices.map((inv) => {
-                const serviceNames = inv.items?.map((it) => it.description) ?? [];
-                const visibleServices = serviceNames.slice(0, 2);
-                const extraCount = serviceNames.length - 2;
 
                 return (
                   <tr
@@ -103,20 +111,6 @@ export default function InvoicesPage() {
                     </td>
                     <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.projectTitle}</td>
                     <td className="p-4 sm:px-6 text-[var(--muted)]">{inv.clientName}</td>
-                    <td className="p-4 sm:px-6 hidden md:table-cell">
-                      <div className="flex flex-wrap gap-1.5">
-                        {visibleServices.map((name, i) => (
-                          <span key={i} className="inline-flex text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-[var(--muted-bg)] text-[var(--muted)] border border-[var(--border)] whitespace-nowrap">
-                            {name}
-                          </span>
-                        ))}
-                        {extraCount > 0 && (
-                          <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap">
-                            +{extraCount} more
-                          </span>
-                        )}
-                      </div>
-                    </td>
                     <td className="p-4 sm:px-6 text-[var(--muted)] font-medium">
                       {new Date(inv.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
@@ -148,6 +142,30 @@ export default function InvoicesPage() {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-[var(--border)] bg-[var(--card)]/50">
+            <p className="text-sm text-[var(--muted)]">
+              Page {page} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => load(page - 1)}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] bg-[var(--card)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--muted-bg)] transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => load(page + 1)}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] bg-[var(--card)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--muted-bg)] transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

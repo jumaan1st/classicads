@@ -35,6 +35,17 @@ type InvoiceDetailed = {
     items: InvoiceItem[];
 };
 
+type BusinessProfile = {
+    id: string;
+    ownerName: string | null;
+    shopName: string | null;
+    upiId: string | null;
+    gstNumber: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+};
+
 const statusColors: Record<string, string> = {
     draft: "bg-[var(--muted-bg)] text-[var(--muted)] border-[var(--border)]",
     sent: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -51,6 +62,17 @@ export default function ViewInvoicePage() {
     const [loading, setLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
     const [paidStatus, setPaidStatus] = useState<string>("draft");
+    const [profile, setProfile] = useState<BusinessProfile | null>(null);
+    const [isSendingEmail, setIsSendingEmail] = useState(false);
+    const [emailSuccess, setEmailSuccess] = useState<boolean | null>(null);
+    const [statusLoading, setStatusLoading] = useState(false);
+
+    useEffect(() => {
+        fetch("/api/profile")
+            .then(r => r.json())
+            .then(data => setProfile(data.profile))
+            .catch(err => console.error("Profile fetch error:", err));
+    }, []);
 
     const [scale, setScale] = useState(1);
     const [contentHeight, setContentHeight] = useState(1200);
@@ -129,8 +151,74 @@ export default function ViewInvoicePage() {
         }
     };
 
-    const togglePaidStatus = () => {
-        setPaidStatus(prev => prev === "paid" ? "sent" : "paid");
+    const togglePaidStatus = async () => {
+        if (!invoice || statusLoading) return;
+        const newStatus = paidStatus === "paid" ? "sent" : "paid";
+        setStatusLoading(true);
+        try {
+            const res = await fetch(`/api/invoices/${invoice.id}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (res.ok) {
+                setPaidStatus(newStatus);
+            } else {
+                alert("Failed to update status");
+            }
+        } catch (err) {
+            console.error("Status update error:", err);
+            alert("Error updating status");
+        } finally {
+            setStatusLoading(false);
+        }
+    };
+
+    const handleSendEmail = async () => {
+        if (!invoice || isSendingEmail) return;
+        setIsSendingEmail(true);
+        setEmailSuccess(null);
+        try {
+            // 1. Generate PDF
+            const doc = await generatePDF();
+            if (!doc) throw new Error("Could not generate PDF");
+
+            // 2. Convert to Base64
+            const pdfBlob = doc.output("blob");
+            const reader = new FileReader();
+            const base64Promise = new Promise<string>((resolve) => {
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.readAsDataURL(pdfBlob);
+            });
+            const pdfBase64 = await base64Promise;
+
+            // 3. Send to API
+            const res = await fetch("/api/invoices/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    invoiceId: invoice.id,
+                    pdfData: pdfBase64,
+                    fileName: `Invoice-${invoice.invoiceNumber}.pdf`
+                }),
+            });
+
+            if (res.ok) {
+                setEmailSuccess(true);
+                setPaidStatus("sent");
+                setTimeout(() => setEmailSuccess(null), 3000);
+            } else {
+                setEmailSuccess(false);
+                const data = await res.json();
+                alert(data.error || "Failed to send email");
+            }
+        } catch (err) {
+            console.error("Email error:", err);
+            setEmailSuccess(false);
+            alert("Error sending email");
+        } finally {
+            setIsSendingEmail(false);
+        }
     };
 
     const generatePDF = async (): Promise<jsPDF | null> => {
@@ -253,14 +341,21 @@ export default function ViewInvoicePage() {
                     {/* Mark Paid/Unpaid toggle */}
                     <button
                         onClick={togglePaidStatus}
+                        disabled={statusLoading}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-xs font-bold ${isPaid
                             ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-500"
                             : "bg-[var(--muted-bg)] border-[var(--border)] text-[var(--foreground)] hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-500"
-                            }`}
+                            } ${statusLoading ? "opacity-50 cursor-not-allowed" : ""}`}
                         title={isPaid ? "Mark as Unpaid" : "Mark as Paid"}
                     >
-                        {isPaid ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                        <span className="hidden sm:inline">{isPaid ? "Paid" : "Mark Paid"}</span>
+                        {statusLoading ? (
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                        ) : isPaid ? (
+                            <ToggleRight className="w-4 h-4" />
+                        ) : (
+                            <ToggleLeft className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">{statusLoading ? "Updating..." : isPaid ? "Paid" : "Mark Paid"}</span>
                     </button>
 
                     <button
@@ -278,9 +373,26 @@ export default function ViewInvoicePage() {
                         <Printer className="w-4 h-4" />
                         <span className="hidden sm:inline">Print</span>
                     </button>
-                    <button className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/20 text-xs text-sm font-bold">
-                        <Send className="w-4 h-4" />
-                        Send Email
+                    <button
+                        onClick={handleSendEmail}
+                        disabled={isSendingEmail}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg text-xs text-sm font-bold ${emailSuccess === true
+                            ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                            : emailSuccess === false
+                                ? "bg-red-600 hover:bg-red-500 shadow-red-500/20"
+                                : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
+                            } text-white disabled:opacity-50`}
+                    >
+                        {isSendingEmail ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : emailSuccess === true ? (
+                            <CheckCircle2 className="w-4 h-4" />
+                        ) : (
+                            <Send className="w-4 h-4" />
+                        )}
+                        <span className="hidden sm:inline">
+                            {isSendingEmail ? "Sending..." : emailSuccess === true ? "Sent!" : emailSuccess === false ? "Failed" : "Send Email"}
+                        </span>
                     </button>
                 </div>
             </div>
@@ -324,12 +436,11 @@ export default function ViewInvoicePage() {
                                     <div className="flex flex-row justify-between items-start gap-8 mb-16">
                                         <div className="flex flex-col gap-2">
                                             <div className="font-heading font-bold tracking-tight text-[var(--foreground)] text-3xl">
-                                                Classic<span className="text-blue-600 dark:text-blue-500">Ads</span>
+                                                {profile?.shopName || "Classic Ads"}
                                             </div>
                                             <div className="text-sm text-[var(--muted)] space-y-0.5 mt-2">
-                                                <p>123 Luxury Avenue, Suite 100</p>
-                                                <p>Mumbai, MH 400001</p>
-                                                <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: 27AABCU9603R1ZM</p>
+                                                <p>{profile?.address || "123 Luxury Avenue, Suite 100"}</p>
+                                                {profile?.gstNumber && <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: {profile.gstNumber}</p>}
                                             </div>
                                         </div>
                                         <div className="text-right flex flex-col items-end gap-1">
@@ -408,30 +519,26 @@ export default function ViewInvoicePage() {
                                     {/* Footer: Payment + Totals — wraps to column if items overflow */}
                                     <div className="flex flex-col sm:flex-row justify-between items-start gap-10 border-t border-[var(--border)] pt-8 flex-wrap">
 
-                                        {/* QR Code */}
                                         <div className="min-w-[220px]">
                                             <h4 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-4">Payment Options</h4>
-                                            {invoice.total < 100000 ? (
-                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3 w-fit">
-                                                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                                                        <QRCodeSVG value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads&am=${invoice.total}&cu=INR`} size={120} level="L" includeMargin={false} />
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
-                                                        <p className="text-xs text-[var(--muted)] mt-0.5">GPay, PhonePe, Paytm accepted</p>
-                                                    </div>
+                                            <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3 w-fit">
+                                                <div className="bg-white p-2 rounded-lg shadow-sm">
+                                                    <QRCodeSVG
+                                                        value={invoice.total < 100000
+                                                            ? `upi://pay?pa=${profile?.upiId || "9886262303@ybl"}&pn=${encodeURIComponent(profile?.shopName || "Classic Ads")}&am=${invoice.total}&cu=INR`
+                                                            : `upi://pay?pa=${profile?.upiId || "9886262303@ybl"}&pn=${encodeURIComponent(profile?.shopName || "Classic Ads")}`}
+                                                        size={120}
+                                                        level="L"
+                                                        includeMargin={false}
+                                                    />
                                                 </div>
-                                            ) : (
-                                                <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center justify-center gap-3 w-fit">
-                                                    <div className="bg-white p-2 rounded-lg shadow-sm">
-                                                        <QRCodeSVG value={`upi://pay?pa=9886262303@ybl&pn=Classic%20Ads`} size={120} level="L" includeMargin={false} />
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
-                                                        <p className="text-xs text-[var(--muted)] mt-0.5">Enter custom amount in app</p>
-                                                    </div>
+                                                <div className="text-center">
+                                                    <p className="text-sm font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
+                                                    <p className="text-xs text-[var(--muted)] mt-0.5">
+                                                        {invoice.total < 100000 ? "GPay, PhonePe, Paytm accepted" : "Enter custom amount in app"}
+                                                    </p>
                                                 </div>
-                                            )}
+                                            </div>
                                         </div>
 
                                         {/* Totals */}

@@ -1,8 +1,5 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import WhatsAppContact from "@/components/WhatsAppContact";
-import MapEmbed from "@/components/MapEmbed"; // Added import for MapEmbed
+import MapEmbed from "@/components/MapEmbed";
 
 type PageContent = {
   title: string;
@@ -15,25 +12,22 @@ type ContactDetails = {
   mapEmbedUrl: string | null;
   shopName: string | null;
 };
-type WhatsAppContactProps = {
-  phone?: string | null;
-};
 
-export default function ContactPage() {
-  const [content, setContent] = useState<PageContent | null>(null);
-  const [contactDetails, setContactDetails] = useState<ContactDetails | null>(null);
+export default async function ContactPage() {
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-  useEffect(() => {
-    fetch("/api/pages?slug=contact")
-      .then((r) => r.json())
-      .then((d) => (d.slug ? setContent(d) : setContent(null)))
-      .catch(() => setContent(null));
+  // Fetch page content and contact details concurrently on the server
+  const [contentRes, contactRes] = await Promise.all([
+    fetch(`${baseUrl}/api/pages?slug=contact`, { next: { revalidate: 60 } }),
+    fetch(`${baseUrl}/api/contact-details`, { next: { revalidate: 60 } }),
+  ]);
 
-    fetch("/api/contact-details")
-      .then((r) => r.json())
-      .then((d) => setContactDetails(d))
-      .catch(() => setContactDetails(null));
-  }, []);
+  const rawContent = contentRes.ok ? await contentRes.json() : null;
+  const content = rawContent?.slug ? (rawContent as PageContent) : null;
+
+  const contactDetails = contactRes.ok ? ((await contactRes.json()) as ContactDetails) : null;
 
   return (
     <div className="bg-[var(--background)] min-h-screen flex flex-col">
@@ -62,6 +56,7 @@ export default function ContactPage() {
                   Choose a service and area if applicable, then type your message. You’ll be redirected to WhatsApp with
                   everything pre-filled.
                 </p>
+                {/* Client Component */}
                 <WhatsAppContact phone={contactDetails?.phone} />
               </div>
             </div>

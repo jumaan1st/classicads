@@ -10,6 +10,7 @@ type Customer = {
   email: string;
   phone: string;
   address?: string;
+  gstNumber?: string;
   notes?: string;
   createdAt: string;
 };
@@ -25,21 +26,33 @@ export default function DashboardCustomersPage() {
     name: "",
     email: "",
     phone: "",
+    gstNumber: "",
     address: "",
     notes: "",
   });
 
-  const load = () => {
-    fetch("/api/customers")
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10;
+
+  const load = (currentPage: number = 1) => {
+    setLoading(true);
+    fetch(`/api/customers?page=${currentPage}&limit=${limit}`)
       .then((r) => r.json())
-      .then((d) => setCustomers(d.customers ?? []))
+      .then((d) => {
+        setCustomers(d.customers ?? []);
+        if (d.pagination) {
+          setTotalPages(d.pagination.pages);
+          setPage(d.pagination.current);
+        }
+      })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => load(), []);
+  useEffect(() => { load(1); }, []);
 
   const resetForm = () => {
-    setForm({ name: "", email: "", phone: "", address: "", notes: "" });
+    setForm({ name: "", email: "", phone: "", gstNumber: "", address: "", notes: "" });
     setEditingId(null);
   };
 
@@ -53,6 +66,7 @@ export default function DashboardCustomersPage() {
       name: customer.name,
       email: customer.email,
       phone: customer.phone,
+      gstNumber: customer.gstNumber || "",
       address: customer.address || "",
       notes: customer.notes || "",
     });
@@ -88,7 +102,7 @@ export default function DashboardCustomersPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this customer?")) return;
     await fetch(`/api/customers/${id}`, { method: "DELETE" });
-    load();
+    load(page);
   };
 
   if (loading) {
@@ -137,6 +151,7 @@ export default function DashboardCustomersPage() {
                     <th className="p-4">Name</th>
                     <th className="p-4">Email</th>
                     <th className="p-4 hidden lg:table-cell">Phone</th>
+                    <th className="p-4 hidden lg:table-cell">GSTIN</th>
                     <th className="p-4 hidden xl:table-cell">Address</th>
                     <th className="p-4 hidden xl:table-cell">Notes</th>
                     <th className="p-4 hidden md:table-cell">Added</th>
@@ -149,6 +164,7 @@ export default function DashboardCustomersPage() {
                       <td className="p-4 font-medium text-[var(--foreground)]">{c.name}</td>
                       <td className="p-4 text-[var(--muted)]">{c.email}</td>
                       <td className="p-4 hidden lg:table-cell text-[var(--muted)]">{c.phone || "—"}</td>
+                      <td className="p-4 hidden lg:table-cell text-[var(--muted)] font-mono text-xs">{c.gstNumber || "—"}</td>
                       <td className="p-4 hidden xl:table-cell text-[var(--muted)] max-w-[160px] truncate">{c.address || "—"}</td>
                       <td className="p-4 hidden xl:table-cell text-[var(--muted)] max-w-[160px] truncate">{c.notes || "—"}</td>
                       <td className="p-4 hidden md:table-cell text-xs text-[var(--muted)]">
@@ -231,6 +247,12 @@ export default function DashboardCustomersPage() {
                       <span className="truncate">{c.address}</span>
                     </div>
                   )}
+                  {c.gstNumber && (
+                    <div className="flex items-center gap-1.5 text-blue-500/80 font-mono text-[10px]">
+                      <FileText size={12} className="flex-shrink-0" />
+                      <span className="truncate">{c.gstNumber}</span>
+                    </div>
+                  )}
                   {c.notes && (
                     <div className="col-span-2 flex items-start gap-1.5 text-[var(--muted)]">
                       <FileText size={12} className="flex-shrink-0 mt-0.5" />
@@ -245,6 +267,30 @@ export default function DashboardCustomersPage() {
               </Card>
             ))}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-[var(--muted)]">
+                Page {page} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => load(page - 1)}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] bg-[var(--card)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--muted-bg)] transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => load(page + 1)}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-[var(--border)] text-sm font-medium text-[var(--foreground)] bg-[var(--card)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--muted-bg)] transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -312,6 +358,16 @@ export default function DashboardCustomersPage() {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm"
+                />
+              </div>
+
+              <div className="relative">
+                <FileText size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] pointer-events-none" />
+                <input
+                  placeholder="GST Number (Optional)"
+                  value={form.gstNumber}
+                  onChange={(e) => setForm({ ...form, gstNumber: e.target.value.toUpperCase() })}
+                  className="w-full rounded-xl border border-[var(--border)] pl-9 pr-4 py-3 bg-[var(--card)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/30 text-sm font-mono"
                 />
               </div>
 

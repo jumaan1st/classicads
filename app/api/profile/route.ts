@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { businessProfile } from '@/db/schema';
 import { getSession } from '@/app/lib/db-session';
 import { eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
 
 export async function GET() {
     try {
@@ -16,9 +17,14 @@ export async function GET() {
             .from(businessProfile)
             .limit(1);
 
-        return NextResponse.json({
-            profile: result[0] ?? null,
-        });
+        return NextResponse.json(
+            { profile: result[0] ?? null },
+            {
+                headers: {
+                    "Cache-Control": "private, s-maxage=60, stale-while-revalidate=300",
+                },
+            }
+        );
 
     } catch (error: any) {
         console.error('Fetch profile error:', error);
@@ -82,6 +88,11 @@ export async function PUT(request: Request) {
 
             savedProfile = inserted;
         }
+
+        revalidatePath("/dashboard/profile");
+        revalidatePath("/about");
+        revalidatePath("/contact");
+        revalidatePath("/");
 
         return NextResponse.json({
             success: true,

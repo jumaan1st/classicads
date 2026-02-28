@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { projects, projectServices, projectAssignments, projectMilestones, projectPhotos, users, services } from "@/db/schema";
-import { eq, inArray, desc } from "drizzle-orm";
+import { eq, inArray, desc, sql, and } from "drizzle-orm";
 import { getSession } from "@/app/lib/db-session";
+import { revalidatePath } from "next/cache";
 
 export async function GET(request: Request) {
   try {
@@ -63,33 +64,103 @@ export async function GET(request: Request) {
       return NextResponse.json(formatted);
     }
 
-    // List fetching filtering natively in memory to easily mimic existing exact endpoint behavior rapidly
-    // Realize production should use raw SQL joins/subqueries
-    const rawProjects = await db.select().from(projects).where(eq(projects.isDeleted, false)).orderBy(desc(projects.createdAt));
-    let allFormatted = [];
+    // List fetching & DB Pagination
+    let allowedProjectIds: string[] | null = null;
 
-    for (const p of rawProjects) {
-      const milestones = await db.select().from(projectMilestones).where(eq(projectMilestones.projectId, p.id));
-      const photos = await db.select().from(projectPhotos).where(eq(projectPhotos.projectId, p.id));
+    if (assignedTo || serviceId) {
+      let assignmentIds: string[] = [];
+      let serviceProjIds: string[] = [];
 
-      const pServices = await db.select({ serviceId: projectServices.serviceId }).from(projectServices).where(eq(projectServices.projectId, p.id));
-      const serviceIds = pServices.map(s => s.serviceId);
+      if (assignedTo) {
+        const pAssigns = await db.select({ projectId: projectAssignments.projectId }).from(projectAssignments).where(eq(projectAssignments.userId, assignedTo));
+        assignmentIds = pAssigns.map(a => a.projectId);
+      }
+      if (serviceId) {
+        const pServices = await db.select({ projectId: projectServices.projectId }).from(projectServices).where(eq(projectServices.serviceId, serviceId));
+        serviceProjIds = pServices.map(s => s.projectId);
+      }
 
-      const pAssigns = await db.select({ userId: projectAssignments.userId }).from(projectAssignments).where(eq(projectAssignments.projectId, p.id));
-      const assignedToIds = pAssigns.map(a => a.userId);
+      if (assignedTo && serviceId) {
+        allowedProjectIds = assignmentIds.filter(id => serviceProjIds.includes(id));
+      } else if (assignedTo) {
+        allowedProjectIds = assignmentIds;
+      } else {
+        allowedProjectIds = serviceProjIds;
+      }
+    }
 
-      const formatted = {
+    const filterConditions = [eq(projects.isDeleted, false)];
+    if (status) filterConditions.push(eq(projects.status, status));
+
+    if (allowedProjectIds !== null) {
+      if (allowedProjectIds.length === 0) {
+        // Break early if filters yield no results
+        return NextResponse.json({ projects: [], total: 0, page, limit, totalPages: 0 });
+      } else {
+        filterConditions.push(inArray(projects.id, allowedProjectIds));
+      }
+    }
+
+    const finalCondition = and(...filterConditions);
+    const offset = (page - 1) * limit;
+
+    // Parallelize core data fetch and row count
+    const [rawProjects, totalResult] = await Promise.all([
+      db
+        .select()
+        .from(projects)
+        .where(finalCondition)
+        .orderBy(desc(projects.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(projects)
+        .where(finalCondition)
+    ]);
+
+    const total = Number(totalResult[0]?.count || 0);
+    const projectIds = rawProjects.map(p => p.id);
+
+    let allMilestones: any[] = [];
+    let allPhotos: any[] = [];
+    let allPServices: any[] = [];
+    let allAssigns: any[] = [];
+
+    // Eliminate N+1. Fetch all dependencies simultaneously using inArray
+    if (projectIds.length > 0) {
+      [allMilestones, allPhotos, allPServices, allAssigns] = await Promise.all([
+        db.select().from(projectMilestones).where(inArray(projectMilestones.projectId, projectIds)),
+        db.select().from(projectPhotos).where(inArray(projectPhotos.projectId, projectIds)),
+        db.select().from(projectServices).where(inArray(projectServices.projectId, projectIds)),
+        db.select().from(projectAssignments).where(inArray(projectAssignments.projectId, projectIds))
+      ]);
+    }
+
+    const allAssignUserIds = [...new Set(allAssigns.map(a => a.userId))];
+    let allUsers: any[] = [];
+    if (expandEmployees && allAssignUserIds.length > 0) {
+      allUsers = await db.select({ id: users.id, name: users.email }).from(users).where(inArray(users.id, allAssignUserIds));
+    }
+
+    const allFormatted = rawProjects.map(p => {
+      const pM = allMilestones.filter(m => m.projectId === p.id);
+      const pP = allPhotos.filter(photo => photo.projectId === p.id);
+      const pS = allPServices.filter(s => s.projectId === p.id).map(s => s.serviceId);
+      const pA = allAssigns.filter(a => a.projectId === p.id).map(a => a.userId);
+
+      const formatted: any = {
         ...p,
-        serviceIds,
-        assignedTo: assignedToIds,
-        milestones: milestones.map(m => ({
+        serviceIds: pS,
+        assignedTo: pA,
+        milestones: pM.map(m => ({
           id: m.id,
           title: m.title,
           dueDate: m.dueDate ? m.dueDate.toISOString().split('T')[0] : null,
           completed: m.completed,
           completedAt: m.completedAt ? m.completedAt.toISOString() : null
         })),
-        progressPhotos: photos.map(photo => ({
+        progressPhotos: pP.map(photo => ({
           url: photo.url,
           caption: photo.caption,
           uploadedAt: photo.uploadedAt ? photo.uploadedAt.toISOString() : null
@@ -98,29 +169,21 @@ export async function GET(request: Request) {
         endDate: p.endDate ? p.endDate.toISOString().split('T')[0] : null,
       };
 
-      if (expandEmployees && assignedToIds.length) {
-        const userRecords = await db.select({ id: users.id, name: users.email }).from(users).where(inArray(users.id, assignedToIds));
-        (formatted as any).assignedEmployeeNames = userRecords.map(u => ({
-          id: u.id,
-          name: u.name.split('@')[0]
-        }));
+      if (expandEmployees && pA.length > 0) {
+        formatted.assignedEmployeeNames = pA.map(userId => {
+          const u = allUsers.find(u => u.id === userId);
+          return {
+            id: userId,
+            name: u ? u.name.split('@')[0] : 'Unknown'
+          };
+        });
       }
 
-      allFormatted.push(formatted);
-    }
-
-    // Apply exact legacy filters
-    if (status) allFormatted = allFormatted.filter((p) => p.status === status);
-    if (assignedTo) allFormatted = allFormatted.filter((p) => p.assignedTo.includes(assignedTo));
-    if (serviceId) allFormatted = allFormatted.filter((p) => p.serviceIds.includes(serviceId));
-
-    const total = allFormatted.length;
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const paginatedData = allFormatted.slice(startIndex, endIndex);
+      return formatted;
+    });
 
     return NextResponse.json({
-      projects: paginatedData,
+      projects: allFormatted,
       total,
       page,
       limit,
@@ -174,6 +237,12 @@ export async function POST(request: Request) {
         );
       }
     }
+
+    revalidatePath("/dashboard/projects");
+    revalidatePath("/projects");
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/about");
 
     return NextResponse.json(newProject[0], { status: 201 });
   } catch (err: any) {
@@ -231,6 +300,13 @@ export async function PUT(request: Request) {
       }
     }
 
+    revalidatePath("/dashboard/projects");
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${id}`);
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/about");
+
     return NextResponse.json(updatedProject[0]);
   } catch (err: any) {
     console.error("Project PUT error:", err);
@@ -255,6 +331,12 @@ export async function DELETE(request: Request) {
       isDeleted: true,
       deletedAt: new Date(),
     }).where(eq(projects.id, id));
+
+    revalidatePath("/dashboard/projects");
+    revalidatePath("/projects");
+    revalidatePath("/");
+    revalidatePath("/dashboard");
+    revalidatePath("/about");
 
     return NextResponse.json({ success: true, message: "Project successfully deleted." });
   } catch (err: any) {

@@ -22,6 +22,7 @@ export async function PUT(
         name: body.name,
         email: body.email,
         phone: body.phone,
+        gstNumber: body.gstNumber || body.gst,
         address: body.address,
         notes: body.notes,
         updatedAt: new Date(),

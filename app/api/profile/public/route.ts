@@ -11,18 +11,25 @@ export async function GET() {
         const p = profiles[0];
 
         // Only expose fields safe for public display
-        return NextResponse.json({
-            profile: {
-                ownerName: p.ownerName,
-                shopName: p.shopName,
-                startedBusinessAt: p.startedBusinessAt,
-                profileImage: p.profileImage,
-                phone: p.phone,
-                email: p.email,
-                address: p.address,
-                googleMapsLocation: p.googleMapsLocation,
+        return NextResponse.json(
+            {
+                profile: {
+                    ownerName: p.ownerName,
+                    shopName: p.shopName,
+                    startedBusinessAt: p.startedBusinessAt,
+                    profileImage: p.profileImage,
+                    phone: p.phone,
+                    email: p.email,
+                    address: p.address,
+                    googleMapsLocation: p.googleMapsLocation,
+                }
+            },
+            {
+                headers: {
+                    "Cache-Control": "public, s-maxage=300, stale-while-revalidate=86400",
+                },
             }
-        });
+        );
     } catch (error: any) {
         console.error('Public profile fetch error:', error);
         return NextResponse.json({ profile: null }, { status: 500 });

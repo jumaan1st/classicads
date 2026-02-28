@@ -8,20 +8,57 @@ export async function GET() {
         // -----------------------------------------------------
         // FEATURED SERVICES
         // -----------------------------------------------------
-        const rawServices = await db
-            .select({
-                id: services.id,
-                name: services.name,
-                slug: services.slug,
-                description: services.description,
-                image: services.image,
-                minPrice: services.minPrice,
-                maxPrice: services.maxPrice,
-            })
-            .from(services)
-            .where(eq(services.isDeleted, false))
-            .orderBy(desc(services.createdAt))
-            .limit(3);
+        // Execute 4 primary queries in parallel
+        const [
+            rawServices,
+            baseProjects,
+            totalProjectsResult,
+            profileResult,
+        ] = await Promise.all([
+            // 1. FEATURED SERVICES
+            db
+                .select({
+                    id: services.id,
+                    name: services.name,
+                    slug: services.slug,
+                    description: services.description,
+                    image: services.image,
+                    minPrice: services.minPrice,
+                    maxPrice: services.maxPrice,
+                })
+                .from(services)
+                .where(eq(services.isDeleted, false))
+                .orderBy(desc(services.createdAt))
+                .limit(3),
+
+            // 2. FEATURED PROJECTS
+            db
+                .select({
+                    id: projects.id,
+                    title: projects.title,
+                    clientName: projects.clientName,
+                })
+                .from(projects)
+                .where(eq(projects.isDeleted, false))
+                .orderBy(desc(projects.createdAt))
+                .limit(4),
+
+            // 3. TOTAL PROJECT COUNT
+            db
+                .select({ count: sql<number>`count(*)` })
+                .from(projects)
+                .where(eq(projects.isDeleted, false)),
+
+            // 4. BUSINESS PROFILE + MAP DATA
+            db
+                .select({
+                    startedBusinessAt: businessProfile.startedBusinessAt,
+                    shopName: businessProfile.shopName,
+                    mapEmbedUrl: businessProfile.mapEmbedUrl,
+                })
+                .from(businessProfile)
+                .limit(1),
+        ]);
 
         const featuredServices = rawServices.map(service => ({
             id: service.id,
@@ -35,30 +72,16 @@ export async function GET() {
             },
         }));
 
-        // -----------------------------------------------------
-        // FEATURED PROJECTS
-        // -----------------------------------------------------
-        const baseProjects = await db
-            .select({
-                id: projects.id,
-                title: projects.title,
-                clientName: projects.clientName,
-            })
-            .from(projects)
-            .where(eq(projects.isDeleted, false))
-            .orderBy(desc(projects.createdAt))
-            .limit(4);
-
         const projectIds = baseProjects.map(project => project.id);
 
         const projectImages = projectIds.length
             ? await db
-                  .select({
-                      projectId: projectPhotos.projectId,
-                      url: projectPhotos.url,
-                  })
-                  .from(projectPhotos)
-                  .where(inArray(projectPhotos.projectId, projectIds))
+                .select({
+                    projectId: projectPhotos.projectId,
+                    url: projectPhotos.url,
+                })
+                .from(projectPhotos)
+                .where(inArray(projectPhotos.projectId, projectIds))
             : [];
 
         const imageLookup = new Map<string, string>();
@@ -74,27 +97,7 @@ export async function GET() {
             image: imageLookup.get(project.id) ?? "/placeholder.jpg",
         }));
 
-        // -----------------------------------------------------
-        // TOTAL PROJECT COUNT
-        // -----------------------------------------------------
-        const totalProjectsResult = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(projects)
-            .where(eq(projects.isDeleted, false));
-
         const totalProjects = Number(totalProjectsResult[0]?.count ?? 0);
-
-        // -----------------------------------------------------
-        // BUSINESS PROFILE + MAP DATA
-        // -----------------------------------------------------
-        const profileResult = await db
-            .select({
-                startedBusinessAt: businessProfile.startedBusinessAt,
-                shopName: businessProfile.shopName,
-                mapEmbedUrl: businessProfile.mapEmbedUrl,
-            })
-            .from(businessProfile)
-            .limit(1);
 
         const profile = profileResult[0];
 
@@ -119,12 +122,19 @@ export async function GET() {
             yearsOfExperience,
         };
 
-        return NextResponse.json({
-            pageContent,
-            services: featuredServices,
-            projects: featuredProjects,
-            mapData,
-        });
+        return NextResponse.json(
+            {
+                pageContent,
+                services: featuredServices,
+                projects: featuredProjects,
+                mapData,
+            },
+            {
+                headers: {
+                    "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+                },
+            }
+        );
 
     } catch (error) {
         console.error("Error fetching home data:", error);

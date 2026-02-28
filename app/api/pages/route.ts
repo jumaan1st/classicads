@@ -6,6 +6,7 @@ import {
   setPages,
   type PageContent,
 } from "./store";
+import { revalidatePath } from "next/cache";
 
 export type { PageContent } from "./store";
 
@@ -47,6 +48,12 @@ export async function POST(request: Request) {
       updatedAt: now,
     };
     setPages([...pages, newPage]);
+
+    revalidatePath("/about");
+    revalidatePath("/contact");
+    revalidatePath("/services");
+    revalidatePath("/");
+
     return NextResponse.json(newPage);
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
@@ -64,6 +71,12 @@ export async function PUT(request: Request) {
     if (description !== undefined) page.description = description;
     if (metaDescription !== undefined) page.metaDescription = metaDescription;
     page.updatedAt = new Date().toISOString();
+
+    revalidatePath("/about");
+    revalidatePath("/contact");
+    revalidatePath("/services");
+    revalidatePath("/");
+
     return NextResponse.json(page);
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
@@ -78,5 +91,11 @@ export async function DELETE(request: Request) {
   const page = id ? pages.find((p) => p.id === id) : slug ? pages.find((p) => p.slug === slug) : null;
   if (!page) return NextResponse.json({ error: "Not found" }, { status: 404 });
   setPages(pages.filter((p) => p.id !== page.id));
+
+  revalidatePath("/about");
+  revalidatePath("/contact");
+  revalidatePath("/services");
+  revalidatePath("/");
+
   return NextResponse.json({ ok: true });
 }

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, timestamp, text, integer, boolean,decimal } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, varchar, timestamp, text, integer, boolean, decimal } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const users = pgTable('users', {
@@ -130,6 +130,7 @@ export const customers = pgTable('customers', {
     name: varchar('name', { length: 255 }).notNull(),
     email: varchar('email', { length: 255 }),
     phone: varchar('phone', { length: 50 }),
+    gstNumber: varchar('gst_number', { length: 15 }),
     address: text('address'),
     notes: text('notes'),
 

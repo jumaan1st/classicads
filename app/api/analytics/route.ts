@@ -1,51 +1,113 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { invoices, invoiceItems, customers, services } from "@/db/schema";
+import { eq, sql, desc, and, gte, lte } from "drizzle-orm";
+import { getSession } from "@/app/lib/db-session";
 
-export interface RevenueDataPoint {
-  month: string;
-  revenue: number;
-  invoices: number;
-}
+export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-export interface ServicePopularity {
-  serviceId: string;
-  serviceName: string;
-  count: number;
-  revenue: number;
-}
+  try {
+    const { searchParams } = new URL(req.url);
+    const filterYear = searchParams.get("year"); // e.g. "2024", "2025" or "all"
 
-export interface Analytics {
-  revenueByMonth: RevenueDataPoint[];
-  servicePopularity: ServicePopularity[];
-  conversionRate: number;
-  totalLeads: number;
-  wonLeads: number;
-  totalRevenueYTD: number;
-  expensesThisMonth: number;
-}
+    let dateFilter = undefined;
+    if (filterYear && filterYear !== "all") {
+      const year = parseInt(filterYear);
+      const startOfYear = new Date(year, 0, 1);
+      const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+      dateFilter = and(gte(invoices.issueDate, startOfYear), lte(invoices.issueDate, endOfYear));
+    } else if (!filterYear) {
+      // Default to current year
+      const year = new Date().getFullYear();
+      const startOfYear = new Date(year, 0, 1);
+      const endOfYear = new Date(year, 11, 31, 23, 59, 59);
+      dateFilter = and(gte(invoices.issueDate, startOfYear), lte(invoices.issueDate, endOfYear));
+    }
 
-const DUMMY_ANALYTICS: Analytics = {
-  revenueByMonth: [
-    { month: "2024-09", revenue: 185000, invoices: 4 },
-    { month: "2024-10", revenue: 220000, invoices: 5 },
-    { month: "2024-11", revenue: 310000, invoices: 6 },
-    { month: "2024-12", revenue: 275000, invoices: 5 },
-    { month: "2025-01", revenue: 195000, invoices: 3 },
-    { month: "2025-02", revenue: 167470, invoices: 2 },
-  ],
-  servicePopularity: [
-    { serviceId: "1", serviceName: "Living Room Design", count: 12, revenue: 480000 },
-    { serviceId: "2", serviceName: "Kitchen Renovation", count: 6, revenue: 720000 },
-    { serviceId: "4", serviceName: "Facade & Exterior Paint", count: 8, revenue: 520000 },
-    { serviceId: "3", serviceName: "Bedroom Makeover", count: 10, revenue: 280000 },
-    { serviceId: "6", serviceName: "Design Consultation", count: 18, revenue: 72000 },
-  ],
-  conversionRate: 32,
-  totalLeads: 45,
-  wonLeads: 14,
-  totalRevenueYTD: 362470,
-  expensesThisMonth: 42000,
-};
+    // Execute all 5 separate queries in parallel
+    const [
+      revenueByMonth,
+      servicePopularity,
+      topCustomerOrdersRow,
+      topCustomerRevenueRow,
+      totalRevRow
+    ] = await Promise.all([
+      db
+        .select({
+          month: sql<string>`to_char(${invoices.issueDate}, 'YYYY-MM')`,
+          revenue: sql<number>`sum(${invoices.total})`,
+          invoices: sql<number>`count(${invoices.id})`,
+        })
+        .from(invoices)
+        .where(dateFilter ? and(eq(invoices.isDeleted, false), dateFilter) : eq(invoices.isDeleted, false))
+        .groupBy(sql`to_char(${invoices.issueDate}, 'YYYY-MM')`)
+        .orderBy(sql`to_char(${invoices.issueDate}, 'YYYY-MM')`),
 
-export async function GET() {
-  return NextResponse.json(DUMMY_ANALYTICS);
+      db
+        .select({
+          serviceName: invoiceItems.description,
+          count: sql<number>`sum(${invoiceItems.quantity})`,
+          revenue: sql<number>`sum(${invoiceItems.amount})`,
+        })
+        .from(invoiceItems)
+        .innerJoin(invoices, eq(invoiceItems.invoiceId, invoices.id))
+        .where(dateFilter ? and(eq(invoices.isDeleted, false), dateFilter) : eq(invoices.isDeleted, false))
+        .groupBy(invoiceItems.description)
+        .orderBy(
+          desc(sql`sum(${invoiceItems.quantity})`),   // Primary sort
+          desc(sql`sum(${invoiceItems.amount})`)      // Secondary sort
+        )
+        .limit(10),
+
+      db
+        .select({
+          name: customers.name,
+          count: sql<number>`count(${invoices.id})`,
+        })
+        .from(invoices)
+        .innerJoin(customers, eq(invoices.customerId, customers.id))
+        .where(dateFilter ? and(eq(invoices.isDeleted, false), dateFilter) : eq(invoices.isDeleted, false))
+        .groupBy(customers.name)
+        .orderBy(desc(sql`count(${invoices.id})`))
+        .limit(1),
+
+      db
+        .select({
+          name: customers.name,
+          revenue: sql<number>`sum(${invoices.total})`,
+        })
+        .from(invoices)
+        .innerJoin(customers, eq(invoices.customerId, customers.id))
+        .where(dateFilter ? and(eq(invoices.isDeleted, false), dateFilter) : eq(invoices.isDeleted, false))
+        .groupBy(customers.name)
+        .orderBy(desc(sql`sum(${invoices.total})`))
+        .limit(1),
+
+      db
+        .select({
+          total: sql<number>`sum(${invoices.total})`,
+        })
+        .from(invoices)
+        .where(dateFilter ? and(eq(invoices.isDeleted, false), dateFilter) : eq(invoices.isDeleted, false))
+    ]);
+
+    return NextResponse.json({
+      revenueByMonth,
+      servicePopularity,
+      topCustomerOrders: topCustomerOrdersRow[0] || null,
+      topCustomerRevenue: topCustomerRevenueRow[0] || null,
+      totalRevenue: totalRevRow[0]?.total || 0,
+      filterYear: filterYear || new Date().getFullYear().toString(),
+    },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      });
+  } catch (err) {
+    console.error("Analytics error:", err);
+    return NextResponse.json({ error: "Failed to fetch analytics" }, { status: 500 });
+  }
 }

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { invoices, invoiceItems, customers } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getSession } from "@/app/lib/db-session";
 import { sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,26 +64,18 @@ export async function GET(request: NextRequest) {
     }
 
     // ================================
-    // 📋 LIST FETCH
+    // 📋 LIST FETCH & PAGINATION
     // ================================
-    let query = db
-      .select({
-        id: invoices.id,
-        invoiceNumber: invoices.invoiceNumber,
-        projectTitle: invoices.projectTitle,
-        issueDate: invoices.issueDate,
-        dueDate: invoices.dueDate,
-        status: invoices.status,
-        total: invoices.total,
-        clientName: customers.name,
-      })
-      .from(invoices)
-      .leftJoin(customers, eq(invoices.customerId, customers.id))
-      .where(eq(invoices.isDeleted, false))
-      .orderBy(desc(invoices.createdAt));
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const limit = parseInt(searchParams.get("limit") ?? "10", 10);
+    const offset = (page - 1) * limit;
 
-    if (status) {
-      query = db
+    const filterConditions = [eq(invoices.isDeleted, false)];
+    if (status) filterConditions.push(eq(invoices.status, status as any));
+    const finalCondition = and(...filterConditions);
+
+    const [data, totalResult] = await Promise.all([
+      db
         .select({
           id: invoices.id,
           invoiceNumber: invoices.invoiceNumber,
@@ -95,16 +88,17 @@ export async function GET(request: NextRequest) {
         })
         .from(invoices)
         .leftJoin(customers, eq(invoices.customerId, customers.id))
-        .where(
-          and(
-            eq(invoices.isDeleted, false),
-            eq(invoices.status, status as any)
-          )
-        )
-        .orderBy(desc(invoices.createdAt));
-    }
+        .where(finalCondition)
+        .orderBy(desc(invoices.createdAt))
+        .limit(limit)
+        .offset(offset),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(invoices)
+        .where(finalCondition)
+    ]);
 
-    const data = await query;
+    const total = Number(totalResult[0]?.count || 0);
 
     // Fetch items for each invoice (optimized)
     const invoiceIds = data.map(i => i.id);
@@ -114,7 +108,8 @@ export async function GET(request: NextRequest) {
     if (invoiceIds.length > 0) {
       const items = await db
         .select()
-        .from(invoiceItems);
+        .from(invoiceItems)
+        .where(inArray(invoiceItems.invoiceId, invoiceIds));
 
       items.forEach(item => {
         if (!itemsMap[item.invoiceId]) itemsMap[item.invoiceId] = [];
@@ -128,7 +123,10 @@ export async function GET(request: NextRequest) {
       items: itemsMap[inv.id] || [],
     }));
 
-    return NextResponse.json({ invoices: formatted });
+    return NextResponse.json({
+      invoices: formatted,
+      pagination: { total, pages: Math.ceil(total / limit), current: page }
+    });
 
   } catch (error) {
     console.error("Invoice GET error:", error);
@@ -201,6 +199,7 @@ export async function POST(request: NextRequest) {
     const randomPart = Math.floor(1000 + Math.random() * 9000);
     const invoiceNumber = `INV-${year}-${randomPart}`;
 
+    let finalInvoiceNumber = invoiceNumber;
     // Check for collision (very rare, but good practice)
     const existing = await db
       .select({ id: invoices.id })
@@ -210,19 +209,18 @@ export async function POST(request: NextRequest) {
 
     if (existing.length > 0) {
       // fallback - add timestamp milliseconds
-      const fallback = `INV-${year}-${randomPart}-${Date.now().toString().slice(-4)}`;
-      // you could also implement a proper sequence/counter in production
+      finalInvoiceNumber = `INV-${year}-${randomPart}-${Date.now().toString().slice(-4)}`;
     }
 
     // ── Transaction: create invoice + items ───────────────────────
     const result = await db.transaction(async (tx) => {
       // 1. Insert invoice
-      const [newInvoice] = await db.insert(invoices).values({
-        invoiceNumber,
+      const [newInvoice] = await tx.insert(invoices).values({
+        invoiceNumber: finalInvoiceNumber,
         customerId,
         projectTitle,
-        issueDate,
-        dueDate,
+        issueDate: new Date(issueDate),
+        dueDate: new Date(dueDate),
         subtotal,
         gstPercent,
         gstAmount,
@@ -258,6 +256,9 @@ export async function POST(request: NextRequest) {
 
       return newInvoice;
     });
+
+    revalidatePath("/dashboard/invoices");
+    revalidatePath("/dashboard");
 
     return NextResponse.json(
       {

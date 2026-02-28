@@ -39,7 +39,19 @@ type CustomerSuggestion = {
     name: string;
     email?: string | null;
     phone?: string | null;
+    gstNumber?: string | null;
     notes?: string | null;
+};
+
+type BusinessProfile = {
+    id: string;
+    ownerName: string | null;
+    shopName: string | null;
+    upiId: string | null;
+    gstNumber: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
 };
 
 type FormData = {
@@ -72,13 +84,48 @@ export default function CreateInvoicePage() {
     const [loading, setLoading] = useState(false);
     const [servicesLoading, setServicesLoading] = useState(true);
     const [saveLoading, setSaveLoading] = useState(false);
+    const [profile, setProfile] = useState<BusinessProfile | null>(null);
+
+    useEffect(() => {
+        fetch("/api/profile")
+            .then(r => r.json())
+            .then(data => setProfile(data.profile))
+            .catch(err => console.error("Profile fetch error:", err));
+    }, []);
+
+    useEffect(() => {
+        const recalculate = () => {
+            if (!scrollContainerRef.current) return;
+            const containerWidth = scrollContainerRef.current.clientWidth;
+            const padding = window.innerWidth < 640 ? 24 : 48;
+            const availableWidth = Math.max(containerWidth - padding, 100);
+            const newScale = Math.min(1, availableWidth / 800);
+            setScale(Math.max(0.2, newScale));
+            if (documentRef.current) setContentHeight(documentRef.current.offsetHeight);
+        };
+
+        if (step === 3) {
+            const containerObserver = new ResizeObserver(recalculate);
+            if (scrollContainerRef.current) containerObserver.observe(scrollContainerRef.current);
+            const docObserver = new ResizeObserver(recalculate);
+            if (documentRef.current) docObserver.observe(documentRef.current);
+            recalculate();
+            return () => { containerObserver.disconnect(); docObserver.disconnect(); };
+        }
+    }, [step]);
 
     const [availableServices, setAvailableServices] = useState<Service[]>([]);
     const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
     const [miscItems, setMiscItems] = useState<MiscItem[]>([{ id: "m0", name: "", amount: "" }]);
+    const [targetTotal, setTargetTotal] = useState<string>("");
+    const [isTaxInclusive, setIsTaxInclusive] = useState(true);
     const [markedPaid, setMarkedPaid] = useState(false);
 
     const amountRefs = useRef<Record<string, HTMLInputElement | null>>({});
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const documentRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
+    const [contentHeight, setContentHeight] = useState(1200);
 
     // Customer search state
     const [customerQuery, setCustomerQuery] = useState("");
@@ -86,6 +133,7 @@ export default function CreateInvoicePage() {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
     const [initialCustomers, setInitialCustomers] = useState<CustomerSuggestion[]>([]);
+    const [activeField, setActiveField] = useState<"clientName" | "clientEmail" | "clientNumber" | null>(null);
 
     const comboboxRef = useRef<HTMLDivElement>(null);
 
@@ -133,19 +181,20 @@ export default function CreateInvoicePage() {
 
     // Live filtering + backend fallback when few matches
     const filterAndSearch = useCallback(async (query: string) => {
-        if (!query.trim()) {
+        if (!query.trim() || !activeField) {
             setCustomerSuggestions(initialCustomers);
             setShowSuggestions(false);
             return;
         }
 
         const q = query.toLowerCase().trim();
-        const filtered = initialCustomers.filter(
-            (c) =>
-                c.name.toLowerCase().includes(q) ||
-                (c.email && c.email.toLowerCase().includes(q)) ||
-                (c.phone && c.phone.toLowerCase().includes(q))
-        );
+        const filtered = initialCustomers.filter((c) => {
+            const nameMatch = c.name.toLowerCase().includes(q);
+            const emailMatch = c.email?.toLowerCase().includes(q);
+            const phoneMatch = c.phone?.toLowerCase().includes(q);
+            const gstMatch = c.gstNumber?.toLowerCase().includes(q);
+            return nameMatch || emailMatch || phoneMatch || gstMatch;
+        });
 
         setCustomerSuggestions(filtered);
         setShowSuggestions(true);
@@ -160,17 +209,26 @@ export default function CreateInvoicePage() {
                         (c: CustomerSuggestion) => !initialCustomers.some((ic) => ic.id === c.id)
                     );
                     setInitialCustomers((prev) => [...prev, ...newOnes]);
-                    setCustomerSuggestions((prev) => [...prev, ...newOnes]);
+                    setCustomerSuggestions((prev) => {
+                        const unique = [...prev];
+                        newOnes.forEach((n: CustomerSuggestion) => {
+                            if (!unique.some(u => u.id === n.id)) unique.push(n);
+                        });
+                        return unique;
+                    });
                 }
             } catch (err) {
                 console.error("Customer search failed", err);
             }
         }
-    }, [initialCustomers]);
+    }, [initialCustomers, activeField]);
 
     useEffect(() => {
-        filterAndSearch(customerQuery);
-    }, [customerQuery, filterAndSearch]);
+        if (activeField) {
+            const query = activeField === "clientName" ? customerQuery : formData[activeField];
+            filterAndSearch(query);
+        }
+    }, [customerQuery, formData.clientEmail, formData.clientNumber, activeField, filterAndSearch]);
 
     const selectCustomer = (cust: CustomerSuggestion) => {
         setFormData({
@@ -178,11 +236,14 @@ export default function CreateInvoicePage() {
             clientName: cust.name,
             clientEmail: cust.email || "",
             clientNumber: cust.phone || "",
-            clientGst: cust.notes?.includes("GST:") ? cust.notes.replace("GST: ", "").trim() : "",
+            clientGst: cust.gstNumber || (cust.notes?.includes("GST:") ? cust.notes.replace("GST: ", "").trim() : ""),
         });
         setSelectedCustomerId(cust.id);
         setCustomerQuery(cust.name);
+        // Fix: Force close suggestions and clear active field
         setShowSuggestions(false);
+        setActiveField(null);
+        setCustomerSuggestions([]);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,16 +294,30 @@ export default function CreateInvoicePage() {
     const removeMisc = (id: string) =>
         setMiscItems((prev) => prev.filter((m) => m.id !== id));
 
-    // ── Totals ───────────────────────────────────────────────────────────────
     const calculateTotal = () => {
-        const serviceTotal = selectedServices.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
-        const miscTotal = miscItems.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
-        const subtotal = serviceTotal + miscTotal;
         const gstPct = parseFloat(formData.gstPercent) || 0;
-        const gstAmt = subtotal * (gstPct / 100);
-        return { serviceTotal, miscTotal, subtotal, gstAmt, total: subtotal + gstAmt };
+
+        const rawServiceTotal = selectedServices.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+        const rawMiscTotal = miscItems.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
+        const rawItemsSum = rawServiceTotal + rawMiscTotal;
+
+        let total, subtotal, gstAmt;
+
+        if (isTaxInclusive) {
+            // Entered amounts include tax
+            total = rawItemsSum;
+            subtotal = total / (1 + gstPct / 100);
+            gstAmt = total - subtotal;
+        } else {
+            // Entered amounts exclude tax
+            subtotal = rawItemsSum;
+            total = subtotal * (1 + gstPct / 100);
+            gstAmt = total - subtotal;
+        }
+
+        return { serviceTotal: rawServiceTotal, miscTotal: rawMiscTotal, subtotal, gstAmt, total, adjustment: 0 };
     };
-    const { serviceTotal, miscTotal, subtotal, gstAmt, total } = calculateTotal();
+    const { serviceTotal, miscTotal, subtotal, gstAmt, total, adjustment } = calculateTotal();
 
     const canStep1 =
         formData.clientName.trim() &&
@@ -264,8 +339,21 @@ export default function CreateInvoicePage() {
             let customerId = selectedCustomerId;
 
             // 1. Create or update customer
-            if (!customerId) {
-                // Try to find existing customer
+            if (customerId) {
+                // Update the selected customer with current form data (name, email, phone, GST)
+                await fetch("/api/customers", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        id: customerId,
+                        name: formData.clientName,
+                        email: formData.clientEmail || null,
+                        phone: formData.clientNumber || null,
+                        gstNumber: formData.clientGst || null,
+                    }),
+                });
+            } else {
+                // Try to find existing customer by email, phone, or name
                 let lookupRes = await fetch(`/api/customers?query=${encodeURIComponent(
                     formData.clientEmail || formData.clientNumber || formData.clientName
                 )}`);
@@ -273,6 +361,7 @@ export default function CreateInvoicePage() {
 
                 let existing = null;
                 if (lookupData.customers?.length > 0) {
+                    // Match by email or phone if available, or just take the first match if it's name-only
                     existing = lookupData.customers.find((c: any) =>
                         (formData.clientEmail && c.email === formData.clientEmail) ||
                         (formData.clientNumber && c.phone === formData.clientNumber)
@@ -280,7 +369,7 @@ export default function CreateInvoicePage() {
                 }
 
                 if (existing) {
-                    // Update
+                    // Update found customer
                     await fetch("/api/customers", {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
@@ -289,12 +378,12 @@ export default function CreateInvoicePage() {
                             name: formData.clientName,
                             email: formData.clientEmail || existing.email,
                             phone: formData.clientNumber || existing.phone,
-                            gst: formData.clientGst || "",
+                            gstNumber: formData.clientGst || existing.gstNumber || null,
                         }),
                     });
                     customerId = existing.id;
                 } else {
-                    // Create new
+                    // Create new customer
                     const createRes = await fetch("/api/customers", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -302,8 +391,9 @@ export default function CreateInvoicePage() {
                             name: formData.clientName,
                             email: formData.clientEmail || null,
                             phone: formData.clientNumber || null,
+                            gstNumber: formData.clientGst || null,
                             address: null,
-                            notes: formData.clientGst ? `GST: ${formData.clientGst}` : null,
+                            notes: null,
                         }),
                     });
                     const { customer } = await createRes.json();
@@ -356,8 +446,10 @@ export default function CreateInvoicePage() {
             });
 
             if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || "Failed to create invoice");
+                const errorData = await res.json();
+                const e = new Error(errorData.error || "Failed to create invoice") as any;
+                e.details = errorData.details;
+                throw e;
             }
 
             const data = await res.json();
@@ -370,7 +462,7 @@ export default function CreateInvoicePage() {
             }
         } catch (err: any) {
             console.error("Save failed:", err);
-            alert(err.message || "Error while saving invoice");
+            alert(err.message + (err.details ? `: ${err.details}` : "") || "Error while saving invoice");
         } finally {
             setSaveLoading(false);
         }
@@ -382,35 +474,33 @@ export default function CreateInvoicePage() {
     // All line items for invoice table
     const allLineItems = [
         ...selectedServices.filter((s) => s.name),
-        ...miscItems.filter((m) => m.name.trim() && m.amount).map((m) => ({
-            serviceId: m.id,
-            name: m.name,
-            description: "Miscellaneous item",
-            amount: m.amount,
-            isCustom: true,
-        })),
     ];
 
     const finalStatus = markedPaid ? "paid" : "draft";
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-12">
-
+        <div className="space-y-6 max-w-5xl mx-auto pb-20 px-4 sm:px-0">
             {/* ── Header ──────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-3 sm:gap-4">
                     {step === 1 ? (
-                        <Link href="/dashboard/invoices" className="p-2 rounded-full hover:bg-[var(--muted-bg)] transition-colors text-[var(--muted)] hover:text-[var(--foreground)]">
+                        <Link href="/dashboard/invoices" className="p-2 rounded-full hover:bg-[var(--muted-bg)] border border-transparent hover:border-[var(--border)] transition-all text-[var(--muted)] hover:text-[var(--foreground)]">
                             <ArrowLeft className="w-5 h-5" />
                         </Link>
                     ) : (
-                        <button type="button" onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)} className="p-2 rounded-full hover:bg-[var(--muted-bg)] transition-colors text-[var(--muted)] hover:text-[var(--foreground)]">
+                        <button type="button" onClick={() => setStep((s) => (s - 1) as 1 | 2 | 3)} className="p-2 rounded-full hover:bg-[var(--muted-bg)] border border-transparent hover:border-[var(--border)] transition-all text-[var(--muted)] hover:text-[var(--foreground)]">
                             <ArrowLeft className="w-5 h-5" />
                         </button>
                     )}
-                    <div>
-                        <h1 className="font-heading text-3xl font-bold text-[var(--foreground)] tracking-tight">
-                            {step === 1 ? "Create Invoice" : step === 2 ? "Miscellaneous Items" : "Preview & Confirm"}
+                    <div className="overflow-hidden">
+                        <div className="flex items-center gap-2 mb-1">
+                            <FileText className="w-4 h-4 text-blue-500" />
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] opacity-60">Invoice Engine</p>
+                        </div>
+                        <h1 className="font-heading text-xl sm:text-2xl font-bold text-[var(--foreground)] tracking-tight truncate">
+                            {step === 1 && "Select Services"}
+                            {step === 2 && "Extra Charges"}
+                            {step === 3 && "Review & Save"}
                         </h1>
                         <p className="text-[var(--muted)] text-sm">
                             {step === 1 ? "Step 1 of 3 — Client & Services" : step === 2 ? "Step 2 of 3 — Extra Charges" : "Step 3 of 3 — Review & Save"}
@@ -419,15 +509,28 @@ export default function CreateInvoicePage() {
                 </div>
 
                 {/* Step indicator */}
-                <div className="flex items-center gap-2">
-                    {([1, 2, 3] as const).map((n, i) => (
-                        <div key={n} className="flex items-center gap-2">
-                            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all ${step > n ? "border-emerald-500 bg-emerald-500 text-white" : step === n ? "border-blue-500 bg-blue-500 text-white" : "border-[var(--border)] text-[var(--muted)]"}`}>
-                                {step > n ? <Check className="w-4 h-4" /> : n}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                    <div className="flex bg-[var(--muted-bg)]/50 rounded-lg p-0.5 border border-[var(--border)] self-end sm:self-auto">
+                        <button type="button" onClick={() => setIsTaxInclusive(true)}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase transition-all whitespace-nowrap ${isTaxInclusive ? "bg-blue-500 text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}>
+                            Incl. Tax
+                        </button>
+                        <button type="button" onClick={() => setIsTaxInclusive(false)}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase transition-all whitespace-nowrap ${!isTaxInclusive ? "bg-blue-500 text-white shadow-sm" : "text-[var(--muted)] hover:text-[var(--foreground)]"}`}>
+                            Excl. Tax
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        {([1, 2, 3] as const).map((n, i) => (
+                            <div key={n} className="flex items-center gap-2">
+                                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-all ${step > n ? "border-emerald-500 bg-emerald-500 text-white" : step === n ? "border-blue-500 bg-blue-500 text-white" : "border-[var(--border)] text-[var(--muted)]"}`}>
+                                    {step > n ? <Check className="w-4 h-4" /> : n}
+                                </div>
+                                {i < 2 && <div className={`w-8 h-0.5 transition-all ${step > n ? "bg-emerald-500" : "bg-[var(--border)]"}`} />}
                             </div>
-                            {i < 2 && <div className={`w-8 h-0.5 transition-all ${step > n ? "bg-emerald-500" : "bg-[var(--border)]"}`} />}
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -453,7 +556,10 @@ export default function CreateInvoicePage() {
                                             setCustomerQuery(e.target.value);
                                             handleChange(e);
                                         }}
-                                        onFocus={() => setShowSuggestions(true)}
+                                        onFocus={() => {
+                                            setActiveField("clientName");
+                                            setShowSuggestions(true);
+                                        }}
                                         placeholder="Search or type new client name..."
                                         className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors pl-10"
                                         required
@@ -461,7 +567,7 @@ export default function CreateInvoicePage() {
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />
                                 </div>
 
-                                {showSuggestions && customerSuggestions.length > 0 && (
+                                {showSuggestions && activeField === "clientName" && customerSuggestions.length > 0 && (
                                     <ul className="absolute z-10 w-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg max-h-60 overflow-auto">
                                         {customerSuggestions.map((cust) => (
                                             <li key={cust.id}>
@@ -473,6 +579,7 @@ export default function CreateInvoicePage() {
                                                     <div className="font-medium">{cust.name}</div>
                                                     <div className="text-xs text-[var(--muted)]">
                                                         {cust.email || cust.phone || "No contact"}
+                                                        {cust.gstNumber && <span className="ml-2 px-1 rounded bg-blue-500/10 text-blue-600 font-mono">{cust.gstNumber}</span>}
                                                     </div>
                                                 </button>
                                             </li>
@@ -481,17 +588,54 @@ export default function CreateInvoicePage() {
                                 )}
                             </div>
 
-                            {/* Email, Phone, GST */}
+                            {/* Email, Phone, GST Fields with Search Drops */}
                             {[
-                                { label: "Email (Optional)", name: "clientEmail", type: "email", placeholder: "e.g. john@example.com" },
-                                { label: "Phone (Optional)", name: "clientNumber", type: "text", placeholder: "e.g. +91 98765 43210" },
+                                { label: "Email (Optional)", name: "clientEmail", type: "email", placeholder: "e.g. john@example.com", icon: Search },
+                                { label: "Phone (Optional)", name: "clientNumber", type: "text", placeholder: "e.g. +91 98765 43210", icon: Search },
                                 { label: "GST Number (Optional)", name: "clientGst", type: "text", placeholder: "e.g. 29ABCDE1234F1Z5" },
                             ].map((f) => (
-                                <div key={f.name} className="space-y-2">
+                                <div key={f.name} className="space-y-2 relative">
                                     <label className="text-sm font-medium text-[var(--foreground)]">{f.label}</label>
-                                    <input type={f.type} name={f.name} value={formData[f.name as keyof FormData]} onChange={handleChange}
-                                        className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors"
-                                        placeholder={f.placeholder} />
+                                    <div className="relative">
+                                        <input
+                                            type={f.type}
+                                            name={f.name}
+                                            value={formData[f.name as keyof FormData]}
+                                            onChange={handleChange}
+                                            onFocus={() => {
+                                                if (f.name === "clientEmail" || f.name === "clientNumber") {
+                                                    setActiveField(f.name as any);
+                                                    setShowSuggestions(true);
+                                                } else {
+                                                    setActiveField(null);
+                                                    setShowSuggestions(false);
+                                                }
+                                            }}
+                                            className={`w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors ${f.icon ? "pl-10" : ""}`}
+                                            placeholder={f.placeholder}
+                                        />
+                                        {f.icon && <f.icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />}
+                                    </div>
+
+                                    {showSuggestions && activeField === f.name && customerSuggestions.length > 0 && (
+                                        <ul className="absolute z-10 w-full mt-1 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-lg max-h-60 overflow-auto">
+                                            {customerSuggestions.map((cust) => (
+                                                <li key={cust.id}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => selectCustomer(cust)}
+                                                        className="w-full text-left px-4 py-2.5 hover:bg-[var(--muted-bg)] transition-colors"
+                                                    >
+                                                        <div className="font-medium">{cust.name}</div>
+                                                        <div className="text-xs text-[var(--muted)]">
+                                                            {cust.email || cust.phone || "No contact"}
+                                                            {cust.gstNumber && <span className="ml-2 px-1 rounded bg-blue-500/10 text-blue-600 font-mono">{cust.gstNumber}</span>}
+                                                        </div>
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                 </div>
                             ))}
                             <div className="space-y-2 sm:col-span-2">
@@ -537,7 +681,7 @@ export default function CreateInvoicePage() {
                         ) : (
                             <div className="space-y-6">
                                 {categories.map((cat) => {
-                                    const catServices = availableServices.filter((s) => s.category === cat);
+                                    const catServices = availableServices.filter((s) => s.category.toLowerCase() === cat);
                                     if (!catServices.length) return null;
                                     return (
                                         <div key={cat}>
@@ -644,7 +788,7 @@ export default function CreateInvoicePage() {
                                 </div>
                                 <div className="space-y-2 min-w-[220px]">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-[var(--muted)]">Services subtotal</span>
+                                        <span className="text-[var(--muted)]">Items {isTaxInclusive ? "(Incl. GST)" : "(Excl. GST)"}</span>
                                         <span className="font-medium text-[var(--foreground)]">₹{serviceTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                     </div>
                                     <p className="text-xs text-[var(--muted)] opacity-60">+ Misc items added in next step</p>
@@ -745,7 +889,7 @@ export default function CreateInvoicePage() {
                                 <span className="text-[var(--muted)]">GST ({formData.gstPercent}%)</span>
                                 <span className="font-medium text-[var(--foreground)]">₹{gstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
-                            <div className="flex justify-between text-lg font-bold border-t border-[var(--border)] pt-3">
+                            <div className="flex justify-between text-lg font-bold border-t border-[var(--border)] pt-3 mt-4">
                                 <span className="text-[var(--foreground)]">Total</span>
                                 <span className="text-blue-400">₹{total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
@@ -786,167 +930,197 @@ export default function CreateInvoicePage() {
                     </div>
 
                     {/* Bill Preview */}
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted-bg)]/30 overflow-hidden mb-6">
-                        <div className="w-full h-10 border-b border-[var(--border)] bg-[var(--card)] flex items-center px-4">
+                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--muted-bg)]/30 overflow-hidden mb-6 flex flex-col items-center">
+                        <div className="w-full h-10 border-b border-[var(--border)] bg-[var(--card)] flex items-center px-4 shrink-0">
                             <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Invoice Preview</span>
-                            {markedPaid && <span className="ml-3 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">PAID seal will appear</span>}
+                            {markedPaid && <span className="ml-3 text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full uppercase tracking-widest">PAID seal active</span>}
                         </div>
-                        <div className="p-4 sm:p-8 bg-neutral-100 dark:bg-neutral-800/40">
-                            <Card className="p-8 sm:p-10 border border-[var(--border)] relative overflow-hidden rounded-xl bg-white dark:bg-[var(--card)]">
-                                {/* Status stripe */}
-                                <div className={`absolute top-0 left-0 w-full h-1.5 ${markedPaid ? "bg-emerald-500" : "bg-blue-500"}`} />
 
-                                <div className="w-full">
-                                    {/* Invoice Header */}
-                                    <div className="flex flex-row justify-between items-start gap-8 mb-12">
-                                        <div className="flex flex-col gap-2">
-                                            <div className="font-heading font-bold tracking-tight text-[var(--foreground)] text-3xl">
-                                                Classic<span className="text-blue-600 dark:text-blue-500">Ads</span>
-                                            </div>
-                                            <div className="text-sm text-[var(--muted)] space-y-0.5 mt-2">
-                                                <p>123 Luxury Avenue, Suite 100</p>
-                                                <p>Mumbai, MH 400001</p>
-                                                <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: 27AABCU9603R1ZM</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end gap-1">
-                                            <h1 className="text-4xl font-heading font-black tracking-tight text-blue-600 dark:text-blue-500 mb-2">INVOICE</h1>
-                                            {[
-                                                { label: "No.", value: invoiceNumber },
-                                                { label: "Issued", value: new Date(formData.issueDate).toLocaleDateString() },
-                                                { label: "Due", value: formData.dueDate ? new Date(formData.dueDate).toLocaleDateString() : "—" },
-                                                { label: "Status", value: markedPaid ? "PAID" : "DRAFT" },
-                                            ].map(({ label, value }) => (
-                                                <div key={label} className="flex justify-end gap-4 text-sm w-48">
-                                                    <span className="text-[var(--muted)] text-left flex-1">{label}</span>
-                                                    <span className={`font-bold text-right ${label === "Status" && markedPaid ? "text-emerald-500" : "text-[var(--foreground)]"}`}>{value}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                        <div
+                            ref={scrollContainerRef}
+                            className="w-full overflow-auto py-4 sm:py-10 bg-neutral-100 dark:bg-neutral-800/40 flex justify-center custom-scrollbar"
+                            style={{ minHeight: '400px', touchAction: 'pan-x pan-y' }}
+                        >
+                            <div style={{ width: `${800 * scale}px`, height: `${contentHeight * scale}px`, flexShrink: 0, position: 'relative' }}>
+                                <div
+                                    ref={documentRef}
+                                    style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: '800px', position: 'absolute', left: 0, top: 0 }}
+                                    className="bg-white dark:bg-[var(--card)] shadow-2xl rounded-xl"
+                                >
+                                    <Card className="p-10 sm:p-12 border border-[var(--border)] relative overflow-hidden rounded-xl bg-[var(--card)]">
+                                        {/* Status stripe */}
+                                        <div className={`absolute top-0 left-0 w-full h-1.5 ${markedPaid ? "bg-emerald-500" : "bg-blue-500"}`} />
 
-                                    {/* Billing info */}
-                                    <div className="grid grid-cols-2 gap-8 mb-10">
-                                        <div className="space-y-3">
-                                            <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)] border-b border-[var(--border)] pb-2">Billed To</h3>
-                                            <p className="font-bold text-[var(--foreground)] text-lg">{formData.clientName || "—"}</p>
-                                            <div className="text-sm text-[var(--muted)] space-y-1">
-                                                {formData.clientEmail && <p>{formData.clientEmail}</p>}
-                                                {formData.clientNumber && <p>{formData.clientNumber}</p>}
-                                                {formData.clientGst && <p className="text-[var(--foreground)]"><span className="text-[var(--muted)] text-xs uppercase tracking-wider mr-2">GSTIN</span>{formData.clientGst}</p>}
-                                            </div>
-                                        </div>
-                                        <div className="border-l border-[var(--border)] pl-8">
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <Building2 className="w-4 h-4 text-amber-500" />
-                                                <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Project Reference</h3>
-                                            </div>
-                                            <p className="font-semibold text-[var(--foreground)] bg-[var(--muted-bg)] inline-block px-3 py-1.5 rounded-md text-sm border border-[var(--border)]">
-                                                {formData.projectTitle || "—"}
-                                            </p>
-                                            <p className="mt-4 text-sm text-[var(--muted)] leading-relaxed">
-                                                Services rendered for interior design, consultation, and execution as per the finalized quotation.
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Line items */}
-                                    <div className="mb-10">
-                                        <table className="w-full text-left text-sm">
-                                            <thead>
-                                                <tr className="border-b-2 border-[var(--border)] text-[var(--foreground)] font-bold text-xs uppercase tracking-wider">
-                                                    <th className="py-3 px-2">Description</th>
-                                                    <th className="py-3 px-2 text-center w-20">Qty</th>
-                                                    <th className="py-3 px-2 text-right w-28">Rate</th>
-                                                    <th className="py-3 px-2 text-right w-32">Amount</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-[var(--border)]">
-                                                {allLineItems.map((s) => (
-                                                    <tr key={s.serviceId}>
-                                                        <td className="py-3 px-2 font-medium text-[var(--foreground)]">
-                                                            {s.name || <em className="text-[var(--muted)] font-normal">Unnamed</em>}
-                                                            <p className="text-xs font-normal text-[var(--muted)] mt-0.5 line-clamp-1">{s.description}</p>
-                                                        </td>
-                                                        <td className="py-3 px-2 text-center text-[var(--muted)]">1</td>
-                                                        <td className="py-3 px-2 text-right text-[var(--muted)]">{(parseFloat(s.amount) || 0).toLocaleString()}</td>
-                                                        <td className="py-3 px-2 text-right font-medium text-[var(--foreground)]">{(parseFloat(s.amount) || 0).toLocaleString()}</td>
-                                                    </tr>
-                                                ))}
-                                                {miscItems.filter((m) => m.name.trim()).length > 0 && (
-                                                    <>
-                                                        <tr><td colSpan={4} className="py-2 px-2"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)] opacity-60">Miscellaneous</span></td></tr>
-                                                        {miscItems.filter((m) => m.name.trim()).map((m) => (
-                                                            <tr key={m.id} className="bg-[var(--muted-bg)]/30">
-                                                                <td className="py-3 px-2 font-medium text-[var(--foreground)]">
-                                                                    {m.name}
-                                                                    <p className="text-xs font-normal text-[var(--muted)] mt-0.5">Miscellaneous charge</p>
-                                                                </td>
-                                                                <td className="py-3 px-2 text-center text-[var(--muted)]">1</td>
-                                                                <td className="py-3 px-2 text-right text-[var(--muted)]">{(parseFloat(m.amount) || 0).toLocaleString()}</td>
-                                                                <td className="py-3 px-2 text-right font-medium text-[var(--foreground)]">{(parseFloat(m.amount) || 0).toLocaleString()}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* Footer */}
-                                    <div className="flex flex-col sm:flex-row justify-between items-start gap-10 border-t border-[var(--border)] pt-8 flex-wrap">
-                                        <div className="min-w-[200px]">
-                                            <h4 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-4">Payment Options</h4>
-                                            <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center gap-3 w-fit">
-                                                <div className="bg-white p-2 rounded-lg shadow-sm">
-                                                    <QRCodeSVG value={total < 100000 ? `upi://pay?pa=9886262303@ybl&pn=Classic%20Ads&am=${Math.round(total)}&cu=INR` : `upi://pay?pa=9886262303@ybl&pn=Classic%20Ads`} size={100} level="L" includeMargin={false} />
-                                                </div>
-                                                <p className="text-xs font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
-                                                {total >= 100000 && <p className="text-xs text-[var(--muted)]">Enter amount manually</p>}
-                                            </div>
-                                        </div>
-
-                                        <div className="min-w-[240px] relative">
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between text-sm py-1">
-                                                    <span className="text-[var(--muted)]">Subtotal</span>
-                                                    <span className="font-medium text-[var(--foreground)]">INR {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm py-1">
-                                                    <span className="text-[var(--muted)]">GST ({formData.gstPercent}%)</span>
-                                                    <span className="font-medium text-[var(--foreground)]">INR {gstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                                </div>
-                                                <div className="flex justify-between items-center bg-[var(--muted-bg)] p-4 rounded-xl border border-[var(--border)] mt-4">
-                                                    <span className="text-[var(--foreground)] font-bold">Total Due</span>
-                                                    <span className="text-xl font-heading font-black text-blue-500">INR {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* PAID stamp */}
-                                            {markedPaid && (
-                                                <div className="mt-8 flex justify-end">
-                                                    <div className="relative flex items-center justify-center" style={{ transform: 'rotate(-12deg)', width: '110px', height: '110px' }}>
-                                                        <div className="absolute inset-0 rounded-full border-4 border-emerald-500 opacity-90" />
-                                                        <div className="absolute inset-[8px] rounded-full border-2 border-emerald-500 opacity-60" />
-                                                        <div className="absolute inset-0 rounded-full bg-emerald-500/10" />
-                                                        <div className="relative flex flex-col items-center justify-center gap-1 z-10">
-                                                            <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                                                            <span className="text-emerald-600 dark:text-emerald-400 font-black text-base tracking-[0.2em] uppercase leading-none">PAID</span>
-                                                            <span className="text-emerald-600/70 dark:text-emerald-400/70 text-[9px] font-bold tracking-widest uppercase">IN FULL</span>
-                                                        </div>
+                                        <div className="w-full">
+                                            {/* Invoice Header */}
+                                            <div className="flex flex-row justify-between items-start gap-8 mb-12">
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="font-heading font-bold tracking-tight text-[var(--foreground)] text-3xl">
+                                                        {profile?.shopName || "Classic Ads"}
+                                                    </div>
+                                                    <div className="text-sm text-[var(--muted)] space-y-0.5 mt-2">
+                                                        <p>{profile?.address || "123 Luxury Avenue, Suite 100"}</p>
+                                                        {profile?.gstNumber && <p className="font-medium text-[var(--foreground)] mt-1">GSTIN: {profile.gstNumber}</p>}
                                                     </div>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </div>
+                                                <div className="text-right flex flex-col items-end gap-1">
+                                                    <h1 className="text-4xl font-heading font-black tracking-tight text-blue-600 dark:text-blue-500 mb-2">INVOICE</h1>
+                                                    {[
+                                                        { label: "No.", value: invoiceNumber },
+                                                        { label: "Issued", value: new Date(formData.issueDate).toLocaleDateString() },
+                                                        { label: "Due", value: formData.dueDate ? new Date(formData.dueDate).toLocaleDateString() : "—" },
+                                                        { label: "Status", value: markedPaid ? "PAID" : "DRAFT" },
+                                                    ].map(({ label, value }) => (
+                                                        <div key={label} className="flex justify-end gap-4 text-sm w-48">
+                                                            <span className="text-[var(--muted)] text-left flex-1">{label}</span>
+                                                            <span className={`font-bold text-right ${label === "Status" && markedPaid ? "text-emerald-500" : "text-[var(--foreground)]"}`}>{value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
 
-                                    <div className="mt-12 text-center">
-                                        <p className="text-xs text-[var(--muted)] uppercase tracking-wider font-semibold opacity-60">
-                                            This is a computer-generated document. No signature is required.
-                                        </p>
-                                    </div>
+                                            {/* Billing info */}
+                                            <div className="grid grid-cols-2 gap-8 mb-10">
+                                                <div className="space-y-3">
+                                                    <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)] border-b border-[var(--border)] pb-2">Billed To</h3>
+                                                    <p className="font-bold text-[var(--foreground)] text-lg">{formData.clientName || "—"}</p>
+                                                    <div className="text-sm text-[var(--muted)] space-y-1">
+                                                        {formData.clientEmail && <p>{formData.clientEmail}</p>}
+                                                        {formData.clientNumber && <p>{formData.clientNumber}</p>}
+                                                        {formData.clientGst && <p className="text-[var(--foreground)]"><span className="text-[var(--muted)] text-xs uppercase tracking-wider mr-2">GSTIN</span>{formData.clientGst}</p>}
+                                                    </div>
+                                                </div>
+                                                <div className="border-l border-[var(--border)] pl-8">
+                                                    <div className="flex items-center gap-2 mb-3">
+                                                        <Building2 className="w-4 h-4 text-amber-500" />
+                                                        <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Project Reference</h3>
+                                                    </div>
+                                                    <p className="font-semibold text-[var(--foreground)] bg-[var(--muted-bg)] inline-block px-3 py-1.5 rounded-md text-sm border border-[var(--border)]">
+                                                        {formData.projectTitle || "—"}
+                                                    </p>
+                                                    <p className="mt-4 text-sm text-[var(--muted)] leading-relaxed">
+                                                        Services rendered for interior design, consultation, and execution as per the finalized quotation.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Line items */}
+                                            <div className="mb-10">
+                                                <table className="w-full text-left text-sm">
+                                                    <thead>
+                                                        <tr className="border-b-2 border-[var(--border)] text-[var(--foreground)] font-bold text-xs uppercase tracking-wider">
+                                                            <th className="py-3 px-2">Description</th>
+                                                            <th className="py-3 px-2 text-center w-20">Qty</th>
+                                                            <th className="py-3 px-2 text-right w-28">Rate</th>
+                                                            <th className="py-3 px-2 text-right w-32">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-[var(--border)]">
+                                                        {allLineItems.map((s) => (
+                                                            <tr key={s.serviceId}>
+                                                                <td className="py-3 px-2 font-medium text-[var(--foreground)]">
+                                                                    {s.name || <em className="text-[var(--muted)] font-normal">Unnamed</em>}
+                                                                    <p className="text-xs font-normal text-[var(--muted)] mt-0.5 line-clamp-1">{s.description}</p>
+                                                                </td>
+                                                                <td className="py-3 px-2 text-center text-[var(--muted)]">1</td>
+                                                                <td className="py-3 px-2 text-right text-[var(--muted)]">{(parseFloat(s.amount) || 0).toLocaleString()}</td>
+                                                                <td className="py-3 px-2 text-right font-medium text-[var(--foreground)]">{(parseFloat(s.amount) || 0).toLocaleString()}</td>
+                                                            </tr>
+                                                        ))}
+                                                        {miscItems.filter((m) => m.name.trim()).length > 0 && (
+                                                            <>
+                                                                <tr><td colSpan={4} className="py-2 px-2"><span className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)] opacity-60">Miscellaneous</span></td></tr>
+                                                                {miscItems.filter((m) => m.name.trim()).map((m) => (
+                                                                    <tr key={m.id} className="bg-[var(--muted-bg)]/30">
+                                                                        <td className="py-3 px-2 font-medium text-[var(--foreground)]">
+                                                                            {m.name}
+                                                                            <p className="text-xs font-normal text-[var(--muted)] mt-0.5">Miscellaneous charge</p>
+                                                                        </td>
+                                                                        <td className="py-3 px-2 text-center text-[var(--muted)]">1</td>
+                                                                        <td className="py-3 px-2 text-right text-[var(--muted)]">{(parseFloat(m.amount) || 0).toLocaleString()}</td>
+                                                                        <td className="py-3 px-2 text-right font-medium text-[var(--foreground)]">{(parseFloat(m.amount) || 0).toLocaleString()}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </>
+                                                        )}
+                                                        {adjustment !== 0 && (
+                                                            <tr className="bg-blue-500/5 italic">
+                                                                <td className="py-3 px-2 font-medium text-[var(--foreground)]">
+                                                                    Adjustment
+                                                                    <p className="text-xs font-normal text-[var(--muted)] mt-0.5">Calculated balancing item</p>
+                                                                </td>
+                                                                <td className="py-3 px-2 text-center text-[var(--muted)]">1</td>
+                                                                <td className="py-3 px-2 text-right text-[var(--muted)]">{adjustment.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                                <td className="py-3 px-2 text-right font-medium text-[var(--foreground)]">{adjustment.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                            </tr>
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+
+                                            {/* Footer */}
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-10 border-t border-[var(--border)] pt-8 flex-wrap">
+                                                <div className="min-w-[200px]">
+                                                    <h4 className="text-[var(--muted)] text-xs font-bold uppercase tracking-widest mb-4">Payment Options</h4>
+                                                    <div className="bg-[var(--muted-bg)]/50 p-4 rounded-xl border border-[var(--border)] flex flex-col items-center gap-3 w-fit">
+                                                        <div className="bg-white p-2 rounded-lg shadow-sm">
+                                                            <QRCodeSVG
+                                                                value={total < 100000
+                                                                    ? `upi://pay?pa=${profile?.upiId || "9886262303@ybl"}&pn=${encodeURIComponent(profile?.shopName || "Classic Ads")}&am=${Math.round(total)}&cu=INR`
+                                                                    : `upi://pay?pa=${profile?.upiId || "9886262303@ybl"}&pn=${encodeURIComponent(profile?.shopName || "Classic Ads")}`}
+                                                                size={100}
+                                                                level="L"
+                                                                includeMargin={false}
+                                                            />
+                                                        </div>
+                                                        <p className="text-xs font-bold text-[var(--foreground)]">Scan to Pay via UPI</p>
+                                                        {total >= 100000 && <p className="text-xs text-[var(--muted)]">Enter amount manually</p>}
+                                                    </div>
+                                                </div>
+
+                                                <div className="min-w-[240px] relative">
+                                                    <div className="space-y-3">
+                                                        <div className="flex justify-between text-sm py-1">
+                                                            <span className="text-[var(--muted)]">Subtotal</span>
+                                                            <span className="font-medium text-[var(--foreground)]">INR {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm py-1">
+                                                            <span className="text-[var(--muted)]">GST ({formData.gstPercent}%)</span>
+                                                            <span className="font-medium text-[var(--foreground)]">INR {gstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center bg-[var(--muted-bg)] p-4 rounded-xl border border-[var(--border)] mt-4">
+                                                            <span className="text-[var(--foreground)] font-bold">Total Due</span>
+                                                            <span className="text-xl font-heading font-black text-blue-500">INR {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* PAID stamp */}
+                                                    {markedPaid && (
+                                                        <div className="mt-8 flex justify-end">
+                                                            <div className="relative flex items-center justify-center" style={{ transform: 'rotate(-12deg)', width: '110px', height: '110px' }}>
+                                                                <div className="absolute inset-0 rounded-full border-4 border-emerald-500 opacity-90" />
+                                                                <div className="absolute inset-[8px] rounded-full border-2 border-emerald-500 opacity-60" />
+                                                                <div className="absolute inset-0 rounded-full bg-emerald-500/10" />
+                                                                <div className="relative flex flex-col items-center justify-center gap-1 z-10">
+                                                                    <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+                                                                    <span className="text-emerald-600 dark:text-emerald-400 font-black text-base tracking-[0.2em] uppercase leading-none">PAID</span>
+                                                                    <span className="text-emerald-600/70 dark:text-emerald-400/70 text-[9px] font-bold tracking-widest uppercase">IN FULL</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-12 text-center">
+                                                <p className="text-xs text-[var(--muted)] uppercase tracking-wider font-semibold opacity-60">
+                                                    This is a computer-generated document. No signature is required.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </Card>
                                 </div>
-                            </Card>
+                            </div>
                         </div>
                     </div>
 
