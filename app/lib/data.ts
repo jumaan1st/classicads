@@ -1,4 +1,6 @@
-import { DUMMY_PROJECTS } from "@/app/api/projects/route";
+import { db } from "@/db";
+import { projects, projectPhotos, projectServices } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 
 function getBaseUrl(): string {
   return (
@@ -35,15 +37,27 @@ const DEFAULT_PROJECT_IMAGE = "https://images.unsplash.com/photo-1618221195710-d
 export async function getFeaturedProjects(): Promise<
   { id: string; title: string; clientName: string; serviceIds: string[]; status: string; image: string; content: string }[]
 > {
-  // Read directly from the in-process data — avoids unreliable HTTP self-fetches on Vercel
-  // where VERCEL_URL points to the deployment URL, not the production alias.
-  return DUMMY_PROJECTS.map((p) => ({
-    id: p.id,
-    title: p.title,
-    clientName: p.clientName,
-    serviceIds: p.serviceIds ?? [],
-    status: p.status,
-    content: p.content ?? "",
-    image: p.progressPhotos?.[0]?.url ?? DEFAULT_PROJECT_IMAGE,
-  }));
+  try {
+    const rawProjects = await db.select().from(projects).orderBy(desc(projects.createdAt)).limit(6);
+    const result = [];
+
+    for (const p of rawProjects) {
+      const photos = await db.select().from(projectPhotos).where(eq(projectPhotos.projectId, p.id));
+      const pServices = await db.select({ serviceId: projectServices.serviceId }).from(projectServices).where(eq(projectServices.projectId, p.id));
+
+      result.push({
+        id: p.id,
+        title: p.title,
+        clientName: p.clientName,
+        serviceIds: pServices.map(s => s.serviceId),
+        status: p.status,
+        content: p.content ?? "",
+        image: photos.length > 0 ? photos[0].url : DEFAULT_PROJECT_IMAGE,
+      });
+    }
+    return result;
+  } catch (error) {
+    console.error("Fetch featured projects failed:", error);
+    return [];
+  }
 }

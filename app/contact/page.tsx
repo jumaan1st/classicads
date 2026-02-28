@@ -1,20 +1,38 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Card from "@/components/Card";
 import WhatsAppContact from "@/components/WhatsAppContact";
 import MapEmbed from "@/components/MapEmbed"; // Added import for MapEmbed
 
-type PageContent = { title: string; description: string };
+type PageContent = {
+  title: string;
+  description: string;
+};
+
+type ContactDetails = {
+  phone: string | null;
+  email: string | null;
+  mapEmbedUrl: string | null;
+  shopName: string | null;
+};
+type WhatsAppContactProps = {
+  phone?: string | null;
+};
 
 export default function ContactPage() {
   const [content, setContent] = useState<PageContent | null>(null);
+  const [contactDetails, setContactDetails] = useState<ContactDetails | null>(null);
 
   useEffect(() => {
     fetch("/api/pages?slug=contact")
       .then((r) => r.json())
       .then((d) => (d.slug ? setContent(d) : setContent(null)))
       .catch(() => setContent(null));
+
+    fetch("/api/contact-details")
+      .then((r) => r.json())
+      .then((d) => setContactDetails(d))
+      .catch(() => setContactDetails(null));
   }, []);
 
   return (
@@ -44,7 +62,7 @@ export default function ContactPage() {
                   Choose a service and area if applicable, then type your message. You’ll be redirected to WhatsApp with
                   everything pre-filled.
                 </p>
-                <WhatsAppContact />
+                <WhatsAppContact phone={contactDetails?.phone} />
               </div>
             </div>
 
@@ -56,7 +74,10 @@ export default function ContactPage() {
 
           {/* Right Column: Map Embed */}
           <div className="flex flex-col h-full w-full aspect-square md:aspect-auto md:min-h-[500px]">
-            <MapEmbed />
+            <MapEmbed
+              mapEmbedUrl={contactDetails?.mapEmbedUrl}
+              title={contactDetails?.shopName ?? "Business Location"}
+            />
           </div>
 
         </div>

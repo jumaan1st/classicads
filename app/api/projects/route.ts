@@ -1,202 +1,264 @@
 import { NextResponse } from "next/server";
-
-export type ProjectStatus = "planning" | "active" | "on_hold" | "completed";
-
-export interface Milestone {
-  id: string;
-  title: string;
-  dueDate: string;
-  completed: boolean;
-  completedAt?: string;
-}
-
-export interface Project {
-  id: string;
-  title: string;
-  clientName: string;
-  clientEmail: string;
-  serviceIds: string[]; // Supports many-to-many relationship with services
-  status: ProjectStatus;
-  startDate: string;
-  endDate?: string;
-  budget: number;
-  assignedTo: string[];
-  milestones: Milestone[];
-  progressPhotos: { url: string; caption: string; uploadedAt: string }[];
-  content: string; // Rich text or markdown content for the detail page
-  createdAt: string;
-}
-
-// Many-to-many: each project has assignedTo[] (employee IDs). Resolve to names for UI.
-const EMPLOYEE_NAMES: Record<string, string> = {
-  EMP1: "Alex Rivera",
-  EMP2: "Sofia Patel",
-  EMP3: "David Kim",
-};
-
-export const DUMMY_PROJECTS: Project[] = [
-  {
-    id: "P1",
-    title: "Mitchell Living Room",
-    clientName: "Sarah Mitchell",
-    clientEmail: "sarah.m@email.com",
-    serviceIds: ["1", "6"], // Connected to Living Room Design & Consultation
-    status: "active",
-    startDate: "2025-02-01",
-    endDate: "2025-03-15",
-    budget: 65000,
-    assignedTo: ["EMP1"],
-    milestones: [
-      { id: "M1", title: "Concept approval", dueDate: "2025-02-05", completed: true, completedAt: "2025-02-04" },
-      { id: "M2", title: "Material ordering", dueDate: "2025-02-12", completed: true, completedAt: "2025-02-11" },
-      { id: "M3", title: "Installation", dueDate: "2025-03-10", completed: false },
-      { id: "M4", title: "Final handover", dueDate: "2025-03-15", completed: false },
-    ],
-    progressPhotos: [
-      { url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=800", caption: "Initial state", uploadedAt: "2025-02-01T10:00:00Z" },
-      { url: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800", caption: "Furniture placed", uploadedAt: "2025-02-18T14:00:00Z" },
-    ],
-    content: "The Mitchell living room redesign focused on maximizing natural light while introducing a sophisticated, earthy color palette. The family wanted a space that felt both luxurious and incredibly comfortable for daily use. We started with custom wide-plank oak flooring, layered with a hand-tufted wool rug, and finalized the room with an oversized sectional. \n\nThe primary challenge was integrating their existing brick fireplace. We solved this by lime-washing the brick and creating custom, built-in floating shelves on either side, turning a dated element into a striking modern focal point.",
-    createdAt: "2025-01-28T10:00:00Z",
-  },
-  {
-    id: "P2",
-    title: "Chen Kitchen Renovation",
-    clientName: "James Chen",
-    clientEmail: "james.chen@email.com",
-    serviceIds: ["2"], // Kitchen Renovation
-    status: "planning",
-    startDate: "2025-03-01",
-    budget: 180000,
-    assignedTo: ["EMP2", "EMP3"],
-    milestones: [
-      { id: "M5", title: "Final design sign-off", dueDate: "2025-02-25", completed: true },
-      { id: "M6", title: "Demolition", dueDate: "2025-03-08", completed: false },
-      { id: "M7", title: "Cabinetry install", dueDate: "2025-04-01", completed: false },
-    ],
-    progressPhotos: [
-      { url: "https://images.unsplash.com/photo-1556910103-1c02745aae4d?w=800", caption: "Before", uploadedAt: "2025-02-10T10:00:00Z" },
-    ],
-    content: "James Chen requested a complete overhaul of his closed-off, 90s-era kitchen. The objective was to create an open-concept chef's kitchen capable of hosting large extended-family gatherings. We are moving load-bearing walls to expand the footprint into the adjacent dining room.\\n\\nThe new layout features a massive 12-foot double-waterfall marble island, smart appliances hidden behind custom flat-panel walnut cabinetry, and a dedicated prep pantry to keep the main area pristine during events.",
-    createdAt: "2025-02-17T14:00:00Z",
-  },
-  {
-    id: "P3",
-    title: "Villa Exterior Paint",
-    clientName: "Raj Kapoor",
-    clientEmail: "raj.k@email.com",
-    serviceIds: ["4", "5"], // Facade & Exterior Paint, Landscape Design
-    status: "completed",
-    startDate: "2025-01-10",
-    endDate: "2025-02-10",
-    budget: 95000,
-    assignedTo: ["EMP2"],
-    milestones: [
-      { id: "M8", title: "Surface prep", dueDate: "2025-01-15", completed: true, completedAt: "2025-01-14" },
-      { id: "M9", title: "Primer & paint", dueDate: "2025-02-05", completed: true, completedAt: "2025-02-05" },
-      { id: "M10", title: "Handover", dueDate: "2025-02-10", completed: true, completedAt: "2025-02-10" },
-    ],
-    progressPhotos: [
-      { url: "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800", caption: "Completed facade", uploadedAt: "2025-02-10T12:00:00Z" },
-      { url: "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800", caption: "Side entrance", uploadedAt: "2025-02-10T12:05:00Z" },
-    ],
-    content: "The Kapoor Villa required a massive exterior rejuvenation. The original stucco was fading and chipping due to heavy sun exposure. We utilized a highly specialized, textured elastomeric coating that not only provides a stunning matte finish but also bridges hairline cracks and waterproofs the exterior.\\n\\nAdditionally, our landscaping team completely redesigned the front approach. We removed water-heavy lawns and replaced them with structured, drought-resistant xeriscaping featuring architectural agaves, corten steel planters, and subtle uplighting that makes the new facade glow at night.",
-    createdAt: "2025-01-05T09:00:00Z",
-  },
-  {
-    id: "P4",
-    title: "Minimalist Master Suite",
-    clientName: "Elena Rodriguez",
-    clientEmail: "elena.r@email.com",
-    serviceIds: ["3", "7"], // Bedroom Makeover, Bathroom Remodeling
-    status: "completed",
-    startDate: "2024-11-01",
-    endDate: "2024-12-15",
-    budget: 110000,
-    assignedTo: ["EMP1", "EMP3"],
-    milestones: [
-      { id: "M11", title: "Demo", dueDate: "2024-11-05", completed: true, completedAt: "2024-11-04" },
-      { id: "M12", title: "Plumbing rough-in", dueDate: "2024-11-15", completed: true, completedAt: "2024-11-14" },
-      { id: "M13", title: "Finishes", dueDate: "2024-12-10", completed: true, completedAt: "2024-12-11" },
-      { id: "M14", title: "Final Walkthrough", dueDate: "2024-12-15", completed: true, completedAt: "2024-12-15" }
-    ],
-    progressPhotos: [
-      { url: "https://images.unsplash.com/photo-1616594039964-ae902f2eea57?w=800", caption: "Finished bedroom", uploadedAt: "2024-12-15T10:00:00Z" },
-      { url: "https://images.unsplash.com/photo-1620626011761-996317b8d101?w=800", caption: "Ensuite bath", uploadedAt: "2024-12-15T11:00:00Z" }
-    ],
-    content: "Elena wanted to unify her master bedroom and ensuite bathroom into a singular, flowing sanctuary. The design relies heavily on 'Japandi' aesthetics—merging Japanese minimalism with Scandinavian warmth.\\n\\nWe tore down the dividing wall between the bedroom and bathroom, replacing it with smart-glass that turns opaque at the flick of a switch for privacy. The bathroom features a poured concrete soaking tub, while the bedroom utilizes custom slatted-wood wall paneling that hides all closet doors and storage.",
-    createdAt: "2024-10-15T09:00:00Z",
-  },
-  {
-    id: "P5",
-    title: "Tech Startup Headquarters",
-    clientName: "Nexus Data Systems",
-    clientEmail: "facilities@nexusdata.tech",
-    serviceIds: ["8"], // Commercial Office Design
-    status: "active",
-    startDate: "2025-01-20",
-    budget: 450000,
-    assignedTo: ["EMP1", "EMP2", "EMP3"],
-    milestones: [
-      { id: "M15", title: "Space Planning", dueDate: "2025-02-10", completed: true, completedAt: "2025-02-09" },
-      { id: "M16", title: "Acoustic treatment", dueDate: "2025-03-01", completed: false },
-      { id: "M17", title: "Furniture installation", dueDate: "2025-04-15", completed: false },
-    ],
-    progressPhotos: [
-      { url: "https://images.unsplash.com/photo-1497366216548-37526070297c?w=800", caption: "Open plan area", uploadedAt: "2025-02-10T15:00:00Z" },
-    ],
-    content: "Nexus Data Systems outgrew their incubator space and secured a 10,000 sq ft industrial loft. The goal is to retain the raw, industrial edge (exposed brick, ducts) while introducing high-tech, sound-dampened workspaces for deep engineering work.\\n\\nWe designed modular 'focus pods' built with custom acoustic felt and glass, alongside expansive, collaborative lounge zones. The entire lighting system is circadian-rhythm enabled, adjusting color temperature throughout the day to boost team energy and well-being.",
-    createdAt: "2024-12-20T11:00:00Z",
-  }
-];
-
-export type ProjectWithEmployees = Project & {
-  assignedEmployeeNames?: { id: string; name: string }[];
-};
+import { db } from "@/db";
+import { projects, projectServices, projectAssignments, projectMilestones, projectPhotos, users, services } from "@/db/schema";
+import { eq, inArray, desc } from "drizzle-orm";
+import { getSession } from "@/app/lib/db-session";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const id = searchParams.get("id");
-  const status = searchParams.get("status");
-  const assignedTo = searchParams.get("assignedTo");
-  const serviceId = searchParams.get("serviceId");
-  const expandEmployees = searchParams.get("expand") === "employees";
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    const status = searchParams.get("status");
+    const assignedTo = searchParams.get("assignedTo");
+    const serviceId = searchParams.get("serviceId");
+    const expandEmployees = searchParams.get("expand") === "employees";
 
-  const page = parseInt(searchParams.get("page") ?? "1", 10);
-  const limit = parseInt(searchParams.get("limit") ?? "6", 10);
+    const page = parseInt(searchParams.get("page") ?? "1", 10);
+    const limit = parseInt(searchParams.get("limit") ?? "6", 10);
 
-  function withEmployeeNames(project: Project): ProjectWithEmployees {
-    if (!expandEmployees) return project;
-    return {
-      ...project,
-      assignedEmployeeNames: project.assignedTo.map((eid) => ({
-        id: eid,
-        name: EMPLOYEE_NAMES[eid] ?? eid,
-      })),
-    };
+    // If ID is requested
+    if (id) {
+      const rawProjects = await db.select().from(projects).where(eq(projects.id, id));
+      if (!rawProjects.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
+      const p = rawProjects[0];
+
+      // Fetch Relations
+      const milestones = await db.select().from(projectMilestones).where(eq(projectMilestones.projectId, p.id));
+      const photos = await db.select().from(projectPhotos).where(eq(projectPhotos.projectId, p.id));
+
+      const pServices = await db.select({ serviceId: projectServices.serviceId }).from(projectServices).where(eq(projectServices.projectId, p.id));
+      const serviceIds = pServices.map(s => s.serviceId);
+
+      const pAssigns = await db.select({ userId: projectAssignments.userId }).from(projectAssignments).where(eq(projectAssignments.projectId, p.id));
+      const assignedToIds = pAssigns.map(a => a.userId);
+
+      const formatted = {
+        ...p,
+        serviceIds,
+        assignedTo: assignedToIds,
+        milestones: milestones.map(m => ({
+          id: m.id,
+          title: m.title,
+          dueDate: m.dueDate ? m.dueDate.toISOString().split('T')[0] : null,
+          completed: m.completed,
+          completedAt: m.completedAt ? m.completedAt.toISOString() : null
+        })),
+        progressPhotos: photos.map(photo => ({
+          url: photo.url,
+          caption: photo.caption,
+          uploadedAt: photo.uploadedAt ? photo.uploadedAt.toISOString() : null
+        })),
+        startDate: p.startDate ? p.startDate.toISOString().split('T')[0] : null,
+        endDate: p.endDate ? p.endDate.toISOString().split('T')[0] : null,
+      };
+
+      if (expandEmployees && assignedToIds.length) {
+        const userRecords = await db.select({ id: users.id, name: users.email }).from(users).where(inArray(users.id, assignedToIds));
+        (formatted as any).assignedEmployeeNames = userRecords.map(u => ({
+          id: u.id,
+          name: u.name.split('@')[0]
+        }));
+      }
+
+      return NextResponse.json(formatted);
+    }
+
+    // List fetching filtering natively in memory to easily mimic existing exact endpoint behavior rapidly
+    // Realize production should use raw SQL joins/subqueries
+    const rawProjects = await db.select().from(projects).where(eq(projects.isDeleted, false)).orderBy(desc(projects.createdAt));
+    let allFormatted = [];
+
+    for (const p of rawProjects) {
+      const milestones = await db.select().from(projectMilestones).where(eq(projectMilestones.projectId, p.id));
+      const photos = await db.select().from(projectPhotos).where(eq(projectPhotos.projectId, p.id));
+
+      const pServices = await db.select({ serviceId: projectServices.serviceId }).from(projectServices).where(eq(projectServices.projectId, p.id));
+      const serviceIds = pServices.map(s => s.serviceId);
+
+      const pAssigns = await db.select({ userId: projectAssignments.userId }).from(projectAssignments).where(eq(projectAssignments.projectId, p.id));
+      const assignedToIds = pAssigns.map(a => a.userId);
+
+      const formatted = {
+        ...p,
+        serviceIds,
+        assignedTo: assignedToIds,
+        milestones: milestones.map(m => ({
+          id: m.id,
+          title: m.title,
+          dueDate: m.dueDate ? m.dueDate.toISOString().split('T')[0] : null,
+          completed: m.completed,
+          completedAt: m.completedAt ? m.completedAt.toISOString() : null
+        })),
+        progressPhotos: photos.map(photo => ({
+          url: photo.url,
+          caption: photo.caption,
+          uploadedAt: photo.uploadedAt ? photo.uploadedAt.toISOString() : null
+        })),
+        startDate: p.startDate ? p.startDate.toISOString().split('T')[0] : null,
+        endDate: p.endDate ? p.endDate.toISOString().split('T')[0] : null,
+      };
+
+      if (expandEmployees && assignedToIds.length) {
+        const userRecords = await db.select({ id: users.id, name: users.email }).from(users).where(inArray(users.id, assignedToIds));
+        (formatted as any).assignedEmployeeNames = userRecords.map(u => ({
+          id: u.id,
+          name: u.name.split('@')[0]
+        }));
+      }
+
+      allFormatted.push(formatted);
+    }
+
+    // Apply exact legacy filters
+    if (status) allFormatted = allFormatted.filter((p) => p.status === status);
+    if (assignedTo) allFormatted = allFormatted.filter((p) => p.assignedTo.includes(assignedTo));
+    if (serviceId) allFormatted = allFormatted.filter((p) => p.serviceIds.includes(serviceId));
+
+    const total = allFormatted.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedData = allFormatted.slice(startIndex, endIndex);
+
+    return NextResponse.json({
+      projects: paginatedData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    });
+
+  } catch (error: any) {
+    console.error("Projects Fetch Error:", error.message);
+    return NextResponse.json({ error: "Failed to fetch projects" }, { status: 500 });
   }
+}
 
-  if (id) {
-    const project = DUMMY_PROJECTS.find((p) => p.id === id);
-    if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(withEmployeeNames(project));
+export async function POST(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const data = await request.json();
+
+    const newProject = await db.insert(projects).values({
+      title: data.title,
+      clientName: data.clientName,
+      clientEmail: data.clientEmail,
+      status: data.status,
+      startDate: new Date(data.startDate),
+      endDate: data.endDate ? new Date(data.endDate) : null,
+      budget: data.budget,
+      content: data.content
+    }).returning();
+
+    const projectId = newProject[0].id;
+
+    if (data.serviceIds && Array.isArray(data.serviceIds)) {
+      if (data.serviceIds.length > 0) {
+        await db.insert(projectServices).values(
+          data.serviceIds.map((sid: string) => ({ projectId, serviceId: sid }))
+        );
+      }
+    }
+
+    if (data.gallery && Array.isArray(data.gallery) && data.gallery.length > 0) {
+      await db.insert(projectPhotos).values(
+        data.gallery.map((url: string) => ({ projectId, url }))
+      );
+    }
+
+    if (data.assignedTo && Array.isArray(data.assignedTo)) {
+      if (data.assignedTo.length > 0) {
+        await db.insert(projectAssignments).values(
+          data.assignedTo.map((uid: string) => ({ projectId, userId: uid }))
+        );
+      }
+    }
+
+    return NextResponse.json(newProject[0], { status: 201 });
+  } catch (err: any) {
+    console.error("Project POST error:", err);
+    return NextResponse.json({ error: "Failed to create project" }, { status: 500 });
   }
+}
 
-  let data = [...DUMMY_PROJECTS];
-  if (status) data = data.filter((p) => p.status === status);
-  if (assignedTo) data = data.filter((p) => p.assignedTo.includes(assignedTo));
-  if (serviceId) data = data.filter((p) => p.serviceIds.includes(serviceId));
+export async function PUT(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const total = data.length;
-  const startIndex = (page - 1) * limit;
-  const endIndex = startIndex + limit;
-  const paginatedData = data.slice(startIndex, endIndex);
+    const data = await request.json();
+    const { id, ...updateData } = data;
 
-  return NextResponse.json({
-    projects: paginatedData.map(withEmployeeNames),
-    total,
-    page,
-    limit,
-    totalPages: Math.ceil(total / limit)
-  });
+    if (!id) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
+
+    const updatedProject = await db.update(projects).set({
+      title: updateData.title,
+      clientName: updateData.clientName,
+      clientEmail: updateData.clientEmail,
+      status: updateData.status,
+      startDate: updateData.startDate ? new Date(updateData.startDate) : undefined,
+      endDate: updateData.endDate ? new Date(updateData.endDate) : null,
+      budget: updateData.budget,
+      content: updateData.content,
+      updatedAt: new Date()
+    }).where(eq(projects.id, id)).returning();
+
+    if (updateData.serviceIds && Array.isArray(updateData.serviceIds)) {
+      await db.delete(projectServices).where(eq(projectServices.projectId, id));
+      if (updateData.serviceIds.length > 0) {
+        await db.insert(projectServices).values(
+          updateData.serviceIds.map((sid: string) => ({ projectId: id, serviceId: sid }))
+        );
+      }
+    }
+
+    if (updateData.gallery !== undefined && Array.isArray(updateData.gallery)) {
+      await db.delete(projectPhotos).where(eq(projectPhotos.projectId, id));
+      if (updateData.gallery.length > 0) {
+        await db.insert(projectPhotos).values(
+          updateData.gallery.map((url: string) => ({ projectId: id, url }))
+        );
+      }
+    }
+
+    if (updateData.assignedTo && Array.isArray(updateData.assignedTo)) {
+      await db.delete(projectAssignments).where(eq(projectAssignments.projectId, id));
+      if (updateData.assignedTo.length > 0) {
+        await db.insert(projectAssignments).values(
+          updateData.assignedTo.map((uid: string) => ({ projectId: id, userId: uid }))
+        );
+      }
+    }
+
+    return NextResponse.json(updatedProject[0]);
+  } catch (err: any) {
+    console.error("Project PUT error:", err);
+    return NextResponse.json({ error: "Failed to update project" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await getSession();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+
+    if (!id) return NextResponse.json({ error: "Project ID required" }, { status: 400 });
+
+    const existingProject = await db.select({ id: projects.id }).from(projects).where(eq(projects.id, id));
+    if (!existingProject.length) return NextResponse.json({ error: "Project not found" }, { status: 404 });
+
+    await db.update(projects).set({
+      isDeleted: true,
+      deletedAt: new Date(),
+    }).where(eq(projects.id, id));
+
+    return NextResponse.json({ success: true, message: "Project successfully deleted." });
+  } catch (err: any) {
+    console.error("Project DELETE error:", err);
+    return NextResponse.json({ error: "Failed to delete project" }, { status: 500 });
+  }
 }

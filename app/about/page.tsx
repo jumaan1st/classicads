@@ -5,15 +5,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Award, Users, Target, Sparkles, CheckCircle2, Zap, Shield, Star } from "lucide-react";
 
-
 type PageContent = { title: string; description: string };
-
-const STATS = [
-  { value: "200+", label: "Projects Delivered" },
-  { value: "12+", label: "Years of Experience" },
-  { value: "98%", label: "Client Satisfaction" },
-  { value: "50+", label: "Expert Designers" },
-];
+type Profile = {
+  ownerName?: string | null;
+  shopName?: string | null;
+  startedBusinessAt?: string | null;
+  profileImage?: string | null;
+  phone?: string | null;
+};
+type ProjectStats = { total: number };
 
 const VALUES = [
   {
@@ -33,30 +33,55 @@ const VALUES = [
   },
 ];
 
+function yearsOfExp(startedAt?: string | null): string {
+  if (!startedAt) return "10+";
+  const years = new Date().getFullYear() - new Date(startedAt).getFullYear();
+  return `${years}+`;
+}
+
 export default function AboutPage() {
   const [content, setContent] = useState<PageContent | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [totalProjects, setTotalProjects] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/pages?slug=about")
       .then((r) => r.json())
       .then((d) => (d.slug ? setContent(d) : setContent(null)))
       .catch(() => setContent(null));
+
+    fetch("/api/profile/public")
+      .then((r) => r.json())
+      .then((d) => setProfile(d.profile ?? null))
+      .catch(() => setProfile(null));
+
+    fetch("/api/projects?limit=1000")
+      .then((r) => r.json())
+      .then((d) => setTotalProjects(d.total ?? null))
+      .catch(() => setTotalProjects(null));
   }, []);
+
+  const stats = [
+    { value: totalProjects != null ? `${totalProjects}+` : "—", label: "Projects Delivered" },
+    { value: yearsOfExp(profile?.startedBusinessAt), label: "Years of Experience" },
+    { value: "100%", label: "Client Satisfaction" },
+  ];
+
+  const ownerName = profile?.ownerName || "Owner";
+  const ownerImage = profile?.profileImage || null;
 
   return (
     <div className="bg-[var(--background)] min-h-screen">
 
-      {/* ── HERO (combined with owner) ────────────────── */}
+      {/* ── HERO ────────────────────────────────────── */}
       <section className="relative overflow-hidden border-b border-[var(--border)] pt-12 pb-16 sm:pt-20 md:pt-24 md:pb-24">
-        {/* Grid bg */}
         <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
-        {/* Glow */}
         <div className="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 h-[400px] w-[400px] rounded-full bg-blue-500/10 blur-[140px] pointer-events-none" />
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col-reverse md:flex-row items-center gap-10 md:gap-16 lg:gap-24">
 
-            {/* ── Left: text ── */}
+            {/* Left: text */}
             <div className="flex-1 text-center md:text-left flex flex-col items-center md:items-start">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--background)] shadow-sm mb-6">
                 <Award className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
@@ -92,31 +117,34 @@ export default function AboutPage() {
               </div>
             </div>
 
-            {/* ── Right: owner photo ── */}
+            {/* Right: owner photo */}
             <div className="flex-shrink-0 flex flex-col items-center gap-4">
-              {/* Photo */}
               <div className="relative">
-                <div className="h-52 w-52 sm:h-64 sm:w-64 md:h-72 md:w-72 rounded-[2rem] overflow-hidden border-4 border-[var(--border)] shadow-2xl relative">
-                  {/* Replace src with your actual photo: /images/owner.jpg */}
-                  <Image
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&q=80"
-                    alt="Owner"
-                    fill
-                    priority
-                    className="object-cover"
-                    sizes="(max-width:768px) 208px, 288px"
-                  />
+                <div className="h-52 w-52 sm:h-64 sm:w-64 md:h-72 md:w-72 rounded-[2rem] overflow-hidden border-4 border-[var(--border)] shadow-2xl relative bg-[var(--muted-bg)]">
+                  {ownerImage ? (
+                    <Image
+                      src={ownerImage}
+                      alt={ownerName}
+                      fill
+                      priority
+                      className="object-cover"
+                      sizes="(max-width:768px) 208px, 288px"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center text-5xl text-[var(--muted)] font-bold select-none">
+                      {ownerName.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
                 {/* Owner badge */}
                 <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[var(--card)] border border-[var(--border)] shadow-lg rounded-2xl px-4 py-2 flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-sm font-bold text-[var(--foreground)]">Owner · ClassicAds</span>
+                  <span className="text-sm font-bold text-[var(--foreground)]">Owner · {profile?.shopName ?? "ClassicAds"}</span>
                 </div>
               </div>
-
-              {/* Name + quote */}
+              {/* Name */}
               <div className="mt-6 text-center max-w-[260px]">
-                <p className="font-heading text-xl font-bold text-[var(--foreground)]">Owner Name</p>
+                <p className="font-heading text-xl font-bold text-[var(--foreground)]">{ownerName}</p>
                 <p className="text-xs text-[var(--muted)] mt-1 italic">&ldquo;Your space, transformed with care.&rdquo;</p>
               </div>
             </div>
@@ -125,11 +153,11 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── STATS BAR ───────────────────────────────────── */}
+      {/* ── STATS BAR ── */}
       <section className="border-b border-[var(--border)] bg-[var(--section)]">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
-            {STATS.map((s) => (
+          <dl className="grid grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 text-center">
+            {stats.map((s) => (
               <div key={s.label} className="flex flex-col items-center gap-1">
                 <dt className="font-heading text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[var(--foreground)] to-[var(--muted)]">
                   {s.value}
@@ -143,7 +171,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── STORY ───────────────────────────────────────── */}
+      {/* ── STORY ── */}
       <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
         <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-start">
           {/* Text */}
@@ -200,11 +228,10 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-
         </div>
       </section>
 
-      {/* ── VALUES ──────────────────────────────────────── */}
+      {/* ── VALUES ── */}
       <section className="bg-[var(--section)] border-y border-[var(--border)] relative overflow-hidden">
         <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[400px] w-[400px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24 relative z-10">
@@ -229,9 +256,7 @@ export default function AboutPage() {
                 <div className="h-12 w-12 rounded-2xl bg-blue-500/10 border border-blue-500/10 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300">
                   <Icon className="h-5 w-5 text-blue-500" />
                 </div>
-                <div className="text-xs font-black text-[var(--muted)] uppercase tracking-widest mb-2">
-                  0{idx + 1}
-                </div>
+                <div className="text-xs font-black text-[var(--muted)] uppercase tracking-widest mb-2">0{idx + 1}</div>
                 <h3 className="text-lg sm:text-xl font-bold text-[var(--foreground)] mb-3">{title}</h3>
                 <p className="text-sm sm:text-base text-[var(--muted)] leading-relaxed">{desc}</p>
               </div>
@@ -240,13 +265,11 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── CTA ─────────────────────────────────────────── */}
+      {/* ── CTA ── */}
       <section className="py-16 sm:py-24 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-4xl bg-[var(--section)] border border-[var(--border)] rounded-3xl sm:rounded-[2.5rem] p-8 sm:p-12 md:p-16 text-center relative overflow-hidden shadow-sm">
-          {/* Accent glows */}
           <div className="absolute -top-20 -left-20 h-64 w-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none" />
           <div className="absolute -bottom-20 -right-20 h-64 w-64 rounded-full bg-indigo-500/10 blur-[80px] pointer-events-none" />
-
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 mb-6">
               Start Your Project
@@ -255,26 +278,19 @@ export default function AboutPage() {
               Ready to transform <br className="hidden sm:block" />your space?
             </h2>
             <p className="text-base sm:text-lg text-[var(--muted)] mb-8 sm:mb-10 max-w-lg mx-auto leading-relaxed">
-              Schedule a comprehensive consultation with our lead designers today. We'll bring your vision to life.
+              Schedule a comprehensive consultation with our lead designers today. We&apos;ll bring your vision to life.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
-              <Link
-                href="/contact"
-                className="w-full sm:w-auto inline-flex justify-center items-center gap-2 bg-[var(--foreground)] text-[var(--background)] px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-semibold text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
-              >
+              <Link href="/contact" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 bg-[var(--foreground)] text-[var(--background)] px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-semibold text-base hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg">
                 Contact Us <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link
-                href="/services"
-                className="w-full sm:w-auto inline-flex justify-center items-center gap-2 border border-[var(--border)] text-[var(--foreground)] px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-semibold text-base hover:bg-[var(--muted-bg)] transition-all"
-              >
+              <Link href="/services" className="w-full sm:w-auto inline-flex justify-center items-center gap-2 border border-[var(--border)] text-[var(--foreground)] px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl font-semibold text-base hover:bg-[var(--muted-bg)] transition-all">
                 Explore Services
               </Link>
             </div>
           </div>
         </div>
       </section>
-
     </div>
   );
 }

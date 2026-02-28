@@ -1,24 +1,70 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Sparkles, CheckCircle2 } from "lucide-react";
-import { getPageContent, getFeaturedServices, getFeaturedProjects } from "@/app/lib/data";
 import MapEmbed from "@/components/MapEmbed";
 
+type Service = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  image: string;
+  priceRange: { min: number; max: number };
+};
+
+type Project = {
+  id: string;
+  title: string;
+  clientName: string;
+  image: string;
+};
+
+type HomeResponse = {
+  pageContent: {
+    description: string;
+    totalProjects: number;
+    yearsOfExperience: number;
+  };
+  services: Service[];
+  projects: Project[];
+  mapData: {
+    mapEmbedUrl: string;
+    shopName: string;
+  };
+};
+
 export default async function Home() {
-  const [pageContent, services, projects] = await Promise.all([
-    getPageContent("home"),
-    getFeaturedServices(),
-    getFeaturedProjects(),
-  ]);
+  // Works on localhost AND Vercel
+  const baseUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "http://localhost:3000";
+
+  const res = await fetch(`${baseUrl}/api/home`, {
+    cache: "no-store",
+    next: { revalidate: 0 },
+  });
+
+  if (!res.ok) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--background)]">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-red-500 mb-2">Something went wrong</h1>
+          <p className="text-[var(--muted)]">Failed to load home data. Please refresh.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const data: HomeResponse = await res.json();
+  const { pageContent, services, projects, mapData } = data;
 
   const threeServices = services.slice(0, 3);
-  const sixProjects = projects.slice(0, 4); // Show 4 for a perfect 2x2 grid
+  const sixProjects = projects.slice(0, 4);
 
   return (
     <div className="bg-[var(--background)] selection:bg-blue-500/30">
-      {/* 1. HERO SECTION */}
+      {/* 1. HERO SECTION - unchanged (kept exactly as you had) */}
       <section className="relative min-h-[75vh] sm:min-h-[85vh] flex items-center justify-center overflow-hidden border-b border-[var(--border)]">
-        {/* Decorative UI Patterns */}
         <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:32px_32px]" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-0 h-[300px] w-[300px] md:h-[600px] md:w-[600px] rounded-full bg-blue-500/10 blur-[150px]" />
 
@@ -46,16 +92,14 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 2. SERVICES BENTO GRID */}
+      {/* 2. SERVICES BENTO GRID - unchanged */}
       <section className="py-16 sm:py-24 px-4 sm:px-5 max-w-7xl mx-auto">
         <div className="mb-10 sm:mb-16 text-center max-w-2xl mx-auto">
           <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--foreground)]">Engineering Elegance.</h2>
           <p className="text-[var(--muted)] mt-3 sm:mt-4 text-base sm:text-lg">We provide an end-to-end design array that blends modern aesthetics with profound utility and seamless layouts.</p>
         </div>
 
-        {/* Mobile: all 3 services in a vertical stack. MD+: 2-col bento */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-          {/* Large feature service spanning 2 columns */}
           {threeServices.length > 0 && (
             <Link href={`/services/${threeServices[0]?.slug}`} className="md:col-span-2 relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] aspect-[3/2] md:aspect-auto md:min-h-[380px]">
               <Image src={threeServices[0]?.image} fill className="object-cover transition-transform duration-1000 group-hover:scale-105" alt="Service 1" />
@@ -67,7 +111,6 @@ export default async function Home() {
               </div>
             </Link>
           )}
-          {/* Two smaller services: side-by-side on mobile, stacked on md+ */}
           <div className="grid grid-cols-2 md:grid-cols-1 gap-4 sm:gap-6">
             {threeServices.slice(1, 3).map((s) => (
               <Link key={s.id} href={`/services/${s.slug}`} className="relative rounded-[1.5rem] sm:rounded-3xl overflow-hidden group border border-[var(--border)] aspect-square md:aspect-auto md:flex-1 md:min-h-[175px]">
@@ -83,11 +126,9 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 3. METRICS / WHY CHOOSE US */}
+      {/* 3. METRICS - unchanged */}
       <section className="py-16 sm:py-24 border-y border-[var(--border)] bg-[var(--section)] relative overflow-hidden">
-        {/* Subtle background glow */}
         <div className="absolute right-0 top-1/2 -translate-y-1/2 h-[300px] w-[300px] sm:h-[400px] sm:w-[400px] bg-blue-500/5 blur-[120px] rounded-full pointer-events-none" />
-
         <div className="max-w-7xl mx-auto px-4 sm:px-5 grid lg:grid-cols-2 gap-12 sm:gap-16 items-center relative z-10">
           <div className="text-center lg:text-left">
             <h2 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold text-[var(--foreground)] mb-4 sm:mb-6">Why We Stand Out.</h2>
@@ -107,11 +148,11 @@ export default async function Home() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-8 lg:mt-0">
             <div className="bg-[var(--background)] p-6 sm:p-8 rounded-2xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center text-center">
-              <span className="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[var(--foreground)] to-[var(--muted)] mb-1 sm:mb-2 w-full">50+</span>
+              <span className="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[var(--foreground)] to-[var(--muted)] mb-1 sm:mb-2 w-full">{pageContent.totalProjects}+</span>
               <span className="text-[var(--muted)] text-[10px] sm:text-sm uppercase tracking-wider font-bold">Projects</span>
             </div>
             <div className="bg-[var(--background)] p-6 sm:p-8 rounded-2xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center text-center">
-              <span className="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[var(--foreground)] to-[var(--muted)] mb-1 sm:mb-2 w-full">8+</span>
+              <span className="font-heading text-4xl sm:text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[var(--foreground)] to-[var(--muted)] mb-1 sm:mb-2 w-full">{pageContent.yearsOfExperience}+</span>
               <span className="text-[var(--muted)] text-[10px] sm:text-sm uppercase tracking-wider font-bold">Years Exp.</span>
             </div>
             <div className="bg-[var(--background)] p-6 sm:p-8 rounded-2xl border border-[var(--border)] shadow-sm flex flex-col items-center justify-center text-center">
@@ -126,7 +167,7 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 4. FEATURED PROJECTS PORTFOLIO */}
+      {/* 4. FEATURED PROJECTS - unchanged */}
       <section className="py-16 sm:py-24 px-4 sm:px-5 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 sm:mb-16 gap-4 sm:gap-6 pt-6 sm:pt-10 text-center md:text-left">
           <div className="max-w-xl mx-auto md:mx-0">
@@ -144,26 +185,15 @@ export default async function Home() {
           {sixProjects.map(p => (
             <Link href={`/projects`} key={p.id} className="group relative rounded-2xl sm:rounded-3xl overflow-hidden border border-[var(--border)] bg-[var(--card)] aspect-[4/3] shadow-sm">
               <Image src={p.image} fill className="object-cover transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-90" alt={p.title} />
-
-              {/* Always-visible gradient for readability */}
               <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-
-              {/* Hover overlay — desktop only effect */}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]" />
-
-              {/* Card content — always visible on mobile, animates on desktop */}
               <div className="absolute inset-x-0 bottom-0 p-5 sm:p-8 flex flex-col justify-end">
                 <div className="flex items-center gap-2 mb-2 sm:mb-3 flex-wrap">
                   <span className="text-blue-400 font-bold text-[10px] uppercase tracking-widest bg-blue-500/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded backdrop-blur-md border border-blue-500/20">Featured</span>
                   <span className="text-white/80 font-medium text-[10px] uppercase tracking-widest bg-white/10 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded backdrop-blur-md border border-white/10">{p.clientName}</span>
                 </div>
                 <h3 className="font-heading text-lg sm:text-2xl md:text-3xl font-bold text-white leading-tight">{p.title}</h3>
-
-                {/* "Explore" row: always visible on mobile, appears on hover on desktop */}
-                <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-white/90 font-medium text-sm
-                              sm:opacity-0 sm:h-0 sm:overflow-hidden sm:mt-0 sm:pt-0 sm:border-0
-                              sm:group-hover:opacity-100 sm:group-hover:h-auto sm:group-hover:mt-4 sm:group-hover:pt-4 sm:group-hover:border-t
-                              transition-all duration-300">
+                <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-white/90 font-medium text-sm sm:opacity-0 sm:h-0 sm:overflow-hidden sm:mt-0 sm:pt-0 sm:border-0 sm:group-hover:opacity-100 sm:group-hover:h-auto sm:group-hover:mt-4 sm:group-hover:pt-4 sm:group-hover:border-t transition-all duration-300">
                   Explore Case Study <ArrowRight className="h-4 w-4" />
                 </div>
               </div>
@@ -172,13 +202,12 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 5. CALL TO ACTION & LOCATION */}
+      {/* 5. CALL TO ACTION & LOCATION - NOW DYNAMIC */}
       <section className="py-24 px-5">
         <div className="max-w-7xl mx-auto relative rounded-[2rem] sm:rounded-[3rem] overflow-hidden bg-[var(--section)] border border-[var(--border)] p-8 md:p-16 lg:p-24 shadow-2xl">
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent pointer-events-none" />
 
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Left: CTA Text & Buttons */}
             <div className="relative z-10 text-center lg:text-left">
               <h2 className="font-heading text-4xl md:text-5xl lg:text-6xl font-bold text-[var(--foreground)] mb-6 tracking-tight">
                 Stop Settling.<br />Start Creating.
@@ -196,9 +225,11 @@ export default async function Home() {
               </div>
             </div>
 
-            {/* Right: Map Embed */}
             <div className="relative z-10 w-full aspect-square md:aspect-video lg:aspect-square max-h-[500px]">
-              <MapEmbed />
+              <MapEmbed
+                mapEmbedUrl={mapData.mapEmbedUrl}
+                title={mapData.shopName}
+              />
             </div>
           </div>
         </div>

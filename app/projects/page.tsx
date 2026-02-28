@@ -3,17 +3,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, SlidersHorizontal, X, Check, ArrowUpDown } from "lucide-react";
+import { Search, SlidersHorizontal, X, Check, ArrowUpDown, Trash2, Edit } from "lucide-react";
+import ProjectFormInline from "@/components/ProjectFormInline";
 
 type Project = {
   id: string;
   title: string;
   clientName: string;
-  serviceIds: string[];
+  clientEmail?: string;
   status: string;
   startDate: string;
   endDate?: string;
   budget: number;
+  content?: string;
+  serviceIds: string[];
   progressPhotos?: { url: string }[];
 };
 type Service = { id: string; name: string };
@@ -38,12 +41,17 @@ export default function ProjectsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [projectToEdit, setProjectToEdit] = useState<Project | null>(null);
+
   // Refs for click-outside detection
   const filterBtnRef = useRef<HTMLDivElement>(null);   // toolbar filter button + desktop popover
   const mobileSheetRef = useRef<HTMLDivElement>(null);  // mobile sheet panel
   const sortRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const fetchProjectsData = () => {
+    setLoading(true);
     Promise.all([
       fetch("/api/projects?expand=employees&page=1&limit=100").then(r => r.json()),
       fetch("/api/services").then(r => r.json()),
@@ -53,7 +61,18 @@ export default function ProjectsPage() {
       (sd.services ?? []).forEach((s: Service) => { map[s.id] = s.name; });
       setServicesMap(map);
     }).finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProjectsData();
+    fetch("/api/auth/sessions").then(r => {
+      if (r.ok) setIsAdmin(true);
+    }).catch(() => { });
   }, []);
+
+  const handleSaved = () => {
+    fetchProjectsData();
+  };
 
   useEffect(() => {
     const down = (e: MouseEvent) => {
@@ -107,179 +126,222 @@ export default function ProjectsPage() {
 
   return (
     <div className="bg-[var(--background)] min-h-screen">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 pt-10 sm:pt-12 pb-12 md:pb-16">
-
-        {/* Header */}
-        <div className="mb-8 sm:mb-10 text-center">
-          <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]">Our Projects</h1>
-          <p className="mt-2 text-sm sm:text-base text-[var(--muted)]">Browse our portfolio of completed and active design projects.</p>
+      {modalOpen ? (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 pt-10 sm:pt-12 pb-12 md:pb-16">
+          <ProjectFormInline
+            onClose={() => setModalOpen(false)}
+            onSaved={handleSaved}
+            projectToEdit={projectToEdit || undefined}
+            servicesMap={servicesMap}
+          />
         </div>
+      ) : (
+        <>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8 pt-10 sm:pt-12 pb-12 md:pb-16">
 
-        {/* ── Toolbar ── */}
-        <div className="flex items-center gap-2 sm:gap-3 mb-6">
-          {/* Search */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)] pointer-events-none" />
-            <input
-              type="text" placeholder="Search projects..."
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--card)] pl-10 pr-9 text-sm font-medium text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
-            />
-            {search && (
-              <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]">
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter button + desktop popover */}
-          <div className="relative" ref={filterBtnRef}>
-            <button
-              onClick={() => setFilterOpen(v => !v)}
-              className={`relative h-10 inline-flex items-center gap-2 px-4 rounded-xl border font-semibold text-sm transition-all ${activeFilterCount > 0
-                ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
-                }`}
-            >
-              <SlidersHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Filter</span>
-              {activeFilterCount > 0 && (
-                <span className="h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">{activeFilterCount}</span>
+            {/* Header */}
+            <div className="mb-8 flex flex-col items-center justify-center sm:mb-10 text-center">
+              <h1 className="font-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-[var(--foreground)]">Our Projects</h1>
+              <p className="mt-2 text-sm sm:text-base text-[var(--muted)]">Browse our portfolio of completed and active design projects.</p>
+              {isAdmin && (
+                <button
+                  onClick={() => { setProjectToEdit(null); setModalOpen(true); }}
+                  className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[var(--foreground)] hover:bg-[var(--accent)] hover:text-white text-[var(--background)] font-bold text-sm shadow transition-all border border-[var(--border)]"
+                >
+                  + Add New Project
+                </button>
               )}
-            </button>
+            </div>
 
-            {/* Desktop popover — below button, scrollable */}
-            {filterOpen && (
-              <div className="hidden md:flex absolute left-0 top-[calc(100%+8px)] z-50 w-96 flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl shadow-black/10 max-h-[80vh] overflow-y-auto">
-                <ProjectFilterContent
-                  servicesMap={servicesMap} services={services} toggleService={toggleService}
-                  dateFrom={dateFrom} setDateFrom={setDateFrom}
-                  dateTo={dateTo} setDateTo={setDateTo}
-                  activeFilterCount={activeFilterCount} resultCount={displayed.length}
-                  clearFilters={clearFilters} onDone={() => setFilterOpen(false)}
+            {/* ── Toolbar ── */}
+            <div className="flex items-center gap-2 sm:gap-3 mb-6">
+              {/* Search */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--muted)] pointer-events-none" />
+                <input
+                  type="text" placeholder="Search projects..."
+                  value={search} onChange={e => setSearch(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--card)] pl-10 pr-9 text-sm font-medium text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
                 />
-              </div>
-            )}
-          </div>
-
-          {/* Sort */}
-          <div className="relative" ref={sortRef}>
-            <button
-              onClick={() => setSortOpen(v => !v)}
-              className="h-10 inline-flex items-center gap-2 px-4 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-semibold text-[var(--foreground)] hover:border-blue-500/50 transition-all"
-            >
-              <ArrowUpDown className="h-4 w-4 text-[var(--muted)]" />
-              <span className="hidden sm:inline">{currentSortLabel}</span>
-            </button>
-            {sortOpen && (
-              <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden">
-                <p className="px-4 pt-3 pb-2 text-[10px] font-black uppercase tracking-widest text-[var(--muted)]">Sort by</p>
-                {SORT_OPTIONS.map(opt => (
-                  <button key={opt.value} onClick={() => { setSortBy(opt.value); setSortOpen(false); }}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${sortBy === opt.value ? "text-blue-600 dark:text-blue-400 bg-blue-500/5" : "text-[var(--foreground)] hover:bg-[var(--muted-bg)]"
-                      }`}>
-                    {opt.label}
-                    {sortBy === opt.value && <Check className="h-4 w-4" />}
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--foreground)]">
+                    <X className="h-4 w-4" />
                   </button>
+                )}
+              </div>
+
+              {/* Filter button + desktop popover */}
+              <div className="relative" ref={filterBtnRef}>
+                <button
+                  onClick={() => setFilterOpen(v => !v)}
+                  className={`relative h-10 inline-flex items-center gap-2 px-4 rounded-xl border font-semibold text-sm transition-all ${activeFilterCount > 0
+                    ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    : "border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:border-blue-500/50"
+                    }`}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  <span className="hidden sm:inline">Filter</span>
+                  {activeFilterCount > 0 && (
+                    <span className="h-5 w-5 rounded-full bg-blue-600 text-white text-[10px] font-black flex items-center justify-center">{activeFilterCount}</span>
+                  )}
+                </button>
+
+                {/* Desktop popover — below button, scrollable */}
+                {filterOpen && (
+                  <div className="hidden md:flex absolute left-0 top-[calc(100%+8px)] z-50 w-96 flex-col rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl shadow-black/10 max-h-[80vh] overflow-y-auto">
+                    <ProjectFilterContent
+                      servicesMap={servicesMap} services={services} toggleService={toggleService}
+                      dateFrom={dateFrom} setDateFrom={setDateFrom}
+                      dateTo={dateTo} setDateTo={setDateTo}
+                      activeFilterCount={activeFilterCount} resultCount={displayed.length}
+                      clearFilters={clearFilters} onDone={() => setFilterOpen(false)}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Sort */}
+              <div className="relative" ref={sortRef}>
+                <button
+                  onClick={() => setSortOpen(v => !v)}
+                  className="h-10 inline-flex items-center gap-2 px-4 rounded-xl border border-[var(--border)] bg-[var(--card)] text-sm font-semibold text-[var(--foreground)] hover:border-blue-500/50 transition-all"
+                >
+                  <ArrowUpDown className="h-4 w-4 text-[var(--muted)]" />
+                  <span className="hidden sm:inline">{currentSortLabel}</span>
+                </button>
+                {sortOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-50 w-48 rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-2xl overflow-hidden">
+                    <p className="px-4 pt-3 pb-2 text-[10px] font-black uppercase tracking-widest text-[var(--muted)]">Sort by</p>
+                    {SORT_OPTIONS.map(opt => (
+                      <button key={opt.value} onClick={() => { setSortBy(opt.value); setSortOpen(false); }}
+                        className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${sortBy === opt.value ? "text-blue-600 dark:text-blue-400 bg-blue-500/5" : "text-[var(--foreground)] hover:bg-[var(--muted-bg)]"
+                          }`}>
+                        {opt.label}
+                        {sortBy === opt.value && <Check className="h-4 w-4" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Count */}
+            {!loading && (
+              <p className="text-xs font-medium text-[var(--muted)] mb-5">
+                {displayed.length} result{displayed.length !== 1 ? "s" : ""}
+                {activeFilterCount > 0 && <button onClick={clearFilters} className="ml-3 text-blue-500 hover:underline">Clear filters</button>}
+              </p>
+            )}
+
+            {/* Grid */}
+            {loading ? (
+              <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="aspect-[4/3] animate-pulse rounded-2xl bg-[var(--muted-bg)]" />)}
+              </div>
+            ) : displayed.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <p className="text-2xl font-heading font-bold text-[var(--foreground)] mb-2">No projects found</p>
+                <p className="text-[var(--muted)] text-sm">Try adjusting your filters.</p>
+              </div>
+            ) : (
+              <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
+                {displayed.map(p => (
+                  <Link key={p.id} href={`/projects/${p.id}`} className="group relative rounded-3xl overflow-hidden border border-[var(--border)] bg-[var(--card)] aspect-[4/3] sm:aspect-[4/5] md:aspect-[3/4] shadow-sm block">
+                    {isAdmin && (
+                      <div className="absolute top-6 right-6 z-20 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.preventDefault(); setProjectToEdit(p); setModalOpen(true); }}
+                          className="p-2.5 bg-black/60 backdrop-blur text-white rounded-xl hover:bg-blue-600 transition-colors pointer-events-auto"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            if (confirm(`Delete project ${p.title}?`)) {
+                              const r = await fetch(`/api/projects?id=${p.id}`, { method: "DELETE" });
+                              if (r.ok) setAllProjects(arr => arr.filter(x => x.id !== p.id));
+                            }
+                          }}
+                          className="p-2.5 bg-black/60 backdrop-blur text-white rounded-xl hover:bg-red-600 transition-colors pointer-events-auto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                    <Image src={imageFor(p)} fill className="object-cover transition-all duration-700 group-hover:scale-105 group-hover:opacity-90" alt={p.title} sizes="(max-width:640px) 100vw,33vw" />
+                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]" />
+                    <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8 flex flex-col justify-end translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                      <span className="text-white/80 font-medium text-[10px] uppercase tracking-widest bg-white/10 px-2 py-1 rounded backdrop-blur-md border border-white/10 w-max mb-3">{p.status}</span>
+                      <h3 className="font-heading text-xl sm:text-2xl font-bold text-white leading-tight mb-1">{p.title}</h3>
+                      <p className="text-white/80 text-sm font-medium">{p.clientName}</p>
+                      <div className="mt-4 pt-4 border-t border-white/20 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 h-0 overflow-hidden group-hover:h-auto">
+                        <div className="flex justify-between text-xs font-medium"><span className="text-white/60">Budget</span><span className="text-white">₹{p.budget.toLocaleString()}</span></div>
+                        <div className="flex justify-between text-xs font-medium"><span className="text-white/60">Timeline</span><span className="text-white">{p.endDate ? `Finished ${p.endDate}` : `Started ${p.startDate}`}</span></div>
+                      </div>
+                    </div>
+                  </Link>
                 ))}
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Count */}
-        {!loading && (
-          <p className="text-xs font-medium text-[var(--muted)] mb-5">
-            {displayed.length} result{displayed.length !== 1 ? "s" : ""}
-            {activeFilterCount > 0 && <button onClick={clearFilters} className="ml-3 text-blue-500 hover:underline">Clear filters</button>}
-          </p>
-        )}
-
-        {/* Grid */}
-        {loading ? (
-          <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="aspect-[4/3] animate-pulse rounded-2xl bg-[var(--muted-bg)]" />)}
-          </div>
-        ) : displayed.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-2xl font-heading font-bold text-[var(--foreground)] mb-2">No projects found</p>
-            <p className="text-[var(--muted)] text-sm">Try adjusting your filters.</p>
-          </div>
-        ) : (
-          <div className="grid gap-6 sm:gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {displayed.map(p => (
-              <Link key={p.id} href={`/projects/${p.id}`} className="group relative rounded-3xl overflow-hidden border border-[var(--border)] bg-[var(--card)] aspect-[4/3] sm:aspect-[4/5] md:aspect-[3/4] shadow-sm block">
-                <Image src={imageFor(p)} fill className="object-cover transition-all duration-700 group-hover:scale-105 group-hover:opacity-90" alt={p.title} sizes="(max-width:640px) 100vw,33vw" />
-                <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 backdrop-blur-[2px]" />
-                <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8 flex flex-col justify-end translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                  <span className="text-white/80 font-medium text-[10px] uppercase tracking-widest bg-white/10 px-2 py-1 rounded backdrop-blur-md border border-white/10 w-max mb-3">{p.status}</span>
-                  <h3 className="font-heading text-xl sm:text-2xl font-bold text-white leading-tight mb-1">{p.title}</h3>
-                  <p className="text-white/80 text-sm font-medium">{p.clientName}</p>
-                  <div className="mt-4 pt-4 border-t border-white/20 flex flex-col gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 h-0 overflow-hidden group-hover:h-auto">
-                    <div className="flex justify-between text-xs font-medium"><span className="text-white/60">Budget</span><span className="text-white">₹{p.budget.toLocaleString()}</span></div>
-                    <div className="flex justify-between text-xs font-medium"><span className="text-white/60">Timeline</span><span className="text-white">{p.endDate ? `Finished ${p.endDate}` : `Started ${p.startDate}`}</span></div>
-                  </div>
-                </div>
+            <div className="mt-14 text-center">
+              <Link href="/contact" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-[15px] font-semibold text-white hover:bg-blue-700 shadow-md transition-all">
+                Start your project
               </Link>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-14 text-center">
-          <Link href="/contact" className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-6 py-3 text-[15px] font-semibold text-white hover:bg-blue-700 shadow-md transition-all">
-            Start your project
-          </Link>
-        </div>
-      </div>
-
-      {/* ─── Mobile bottom sheet (z-[9999] so it sits above everything) ─── */}
-      {filterOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/60"
-          style={{ zIndex: 9999 }}
-          onClick={(e) => {
-            // Close only when tapping the dark backdrop, not the sheet itself
-            if (mobileSheetRef.current && !mobileSheetRef.current.contains(e.target as Node)) {
-              setFilterOpen(false);
-            }
-          }}
-        >
-          <div
-            ref={mobileSheetRef}
-            className="absolute bottom-0 left-0 right-0 bg-[var(--card)] rounded-t-[2rem] max-h-[88vh] flex flex-col"
-          >
-            {/* Drag handle */}
-            <div className="flex justify-center pt-3 flex-shrink-0">
-              <div className="h-1.5 w-12 rounded-full bg-[var(--border)]" />
             </div>
+          </div>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
-              <h2 className="font-heading text-xl font-bold text-[var(--foreground)]">Filter</h2>
-              {/* Large, fully visible close button */}
-              <button
-                type="button"
-                onClick={() => setFilterOpen(false)}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-bold shadow transition-opacity hover:opacity-80 active:opacity-70"
+          {/* ─── Mobile bottom sheet (z-[9999] so it sits above everything) ─── */}
+          {filterOpen && (
+            <div
+              className="md:hidden fixed inset-0 bg-black/60"
+              style={{ zIndex: 9999 }}
+              onClick={(e) => {
+                // Close only when tapping the dark backdrop, not the sheet itself
+                if (mobileSheetRef.current && !mobileSheetRef.current.contains(e.target as Node)) {
+                  setFilterOpen(false);
+                }
+              }}
+            >
+              <div
+                ref={mobileSheetRef}
+                className="absolute bottom-0 left-0 right-0 bg-[var(--card)] rounded-t-[2rem] max-h-[88vh] flex flex-col"
               >
-                <X className="h-4 w-4" />
-                Close
-              </button>
-            </div>
+                {/* Drag handle */}
+                <div className="flex justify-center pt-3 flex-shrink-0">
+                  <div className="h-1.5 w-12 rounded-full bg-[var(--border)]" />
+                </div>
 
-            {/* Scrollable filter content */}
-            <div className="overflow-y-auto flex-1">
-              <ProjectFilterContent
-                servicesMap={servicesMap} services={services} toggleService={toggleService}
-                dateFrom={dateFrom} setDateFrom={setDateFrom}
-                dateTo={dateTo} setDateTo={setDateTo}
-                activeFilterCount={activeFilterCount} resultCount={displayed.length}
-                clearFilters={clearFilters} onDone={() => setFilterOpen(false)}
-              />
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] flex-shrink-0">
+                  <h2 className="font-heading text-xl font-bold text-[var(--foreground)]">Filter</h2>
+                  {/* Large, fully visible close button */}
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--foreground)] text-[var(--background)] text-sm font-bold shadow transition-opacity hover:opacity-80 active:opacity-70"
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </button>
+                </div>
+
+                {/* Scrollable filter content */}
+                <div className="overflow-y-auto flex-1">
+                  <ProjectFilterContent
+                    servicesMap={servicesMap} services={services} toggleService={toggleService}
+                    dateFrom={dateFrom} setDateFrom={setDateFrom}
+                    dateTo={dateTo} setDateTo={setDateTo}
+                    activeFilterCount={activeFilterCount} resultCount={displayed.length}
+                    clearFilters={clearFilters} onDone={() => setFilterOpen(false)}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </div>
   );

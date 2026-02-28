@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, LayoutDashboard, Database, Briefcase, FileText, Users, UserSquare, BarChart, Settings } from "lucide-react";
+import { Menu, X, LayoutDashboard, Database, Briefcase, FileText, Users, UserSquare, BarChart, Settings, MonitorSmartphone, Store } from "lucide-react";
 
 type Role = "employee" | "admin";
 
@@ -10,6 +10,8 @@ const adminLinks = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/invoices", label: "Invoices", icon: FileText },
   { href: "/dashboard/customers", label: "Customers", icon: UserSquare },
+  { href: "/dashboard/devices", label: "Devices", icon: MonitorSmartphone },
+  { href: "/dashboard/profile", label: "Business Profile", icon: Store },
 ];
 
 const employeeLinks = [

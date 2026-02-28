@@ -9,7 +9,9 @@ const PHONE_NUMBER = '+91 98862 62303';
 const PHONE_TEL = 'tel:+919886262303';
 const MAPS_URL = 'https://www.google.com/maps/place/Classic+Advertisers/@12.3192946,76.6527369,17z';
 const MAPS_EMBED_SRC = 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3897.94788649067!2d76.6527369!3d12.3192946!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3baf7071ff9656f7%3A0xce67eed7c0247923!2sClassic%20Advertisers!5e0!3m2!1sen!2sin!4v1771762602040!5m2!1sen!2sin';
-const ADDRESS_LINE1 = 'Classic Advertisers';
+const DEFAULT_WHATSAPP = '919886262303';
+const DEFAULT_PHONE = '+91 98862 62303';
+const DEFAULT_PHONE_TEL = 'tel:+919886262303';
 const ADDRESS_LINE2 = 'Mysuru, Karnataka, India';
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -26,7 +28,23 @@ function WhatsAppIcon({ size = 20 }: { size?: number }) {
 export default function FloatingContactWidget() {
     const [open, setOpen] = useState(false);
     const [showMap, setShowMap] = useState(false);
+    const [profile, setProfile] = useState<{ shopName?: string | null; phone?: string | null } | null>(null);
     const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        fetch('/api/profile/public')
+            .then(r => r.json())
+            .then(d => setProfile(d.profile ?? null))
+            .catch(() => { });
+    }, []);
+
+    // Derive values from profile or fall back to defaults
+    const shopName = profile?.shopName || 'Classic Advertisers';
+    const rawPhone = profile?.phone ?? DEFAULT_PHONE;
+    // Normalise phone: strip spaces/dashes/parens for the tel: link
+    const phoneTel = rawPhone ? `tel:${rawPhone.replace(/[^\d+]/g, '')}` : DEFAULT_PHONE_TEL;
+    // Format WhatsApp number (digits only, no +)
+    const waNumber = rawPhone ? rawPhone.replace(/[^\d]/g, '') : DEFAULT_WHATSAPP;
 
     // Close on click outside
     useEffect(() => {
@@ -72,7 +90,7 @@ export default function FloatingContactWidget() {
                             <WhatsAppIcon size={18} />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-white font-bold text-sm leading-none">{ADDRESS_LINE1}</p>
+                            <p className="text-white font-bold text-sm leading-none">{shopName}</p>
                             <p className="text-white/80 text-xs mt-0.5">Usually replies within minutes</p>
                         </div>
                         <button
@@ -95,7 +113,7 @@ export default function FloatingContactWidget() {
                     <div className="px-4 pb-4 pt-2 flex flex-col gap-2">
                         {/* WhatsApp */}
                         <a
-                            href={`https://wa.me/${WHATSAPP_NUMBER}?text=Hi%20Classic%20Advertisers%21%20I%27d%20like%20to%20enquire%20about%20your%20design%20services.%20Could%20you%20please%20help%20me%3F`}
+                            href={`https://wa.me/${waNumber}?text=Hi%20${encodeURIComponent(shopName)}%21%20I%27d%20like%20to%20enquire%20about%20your%20design%20services.%20Could%20you%20please%20help%20me%3F`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-3 bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-green-500/30"
@@ -107,11 +125,11 @@ export default function FloatingContactWidget() {
 
                         {/* Phone */}
                         <a
-                            href={PHONE_TEL}
+                            href={phoneTel}
                             className="flex items-center gap-3 bg-[var(--background)] hover:bg-[var(--muted-bg)] border border-[var(--border)] text-[var(--foreground)] px-4 py-2.5 rounded-xl font-semibold text-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <Phone className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                            {PHONE_NUMBER}
+                            {rawPhone}
                             <ChevronRight className="h-4 w-4 ml-auto opacity-50" />
                         </a>
 
@@ -122,7 +140,7 @@ export default function FloatingContactWidget() {
                         >
                             <MapPin className="h-4 w-4 text-red-500 flex-shrink-0" />
                             <span className="flex-1">
-                                <span className="block leading-none">{ADDRESS_LINE1}</span>
+                                <span className="block leading-none">{shopName}</span>
                                 <span className="block text-[var(--muted)] font-normal text-xs mt-0.5">{ADDRESS_LINE2}</span>
                             </span>
                             <ChevronRight className={`h-4 w-4 opacity-50 transition-transform duration-200 ${showMap ? 'rotate-90' : ''}`} />
