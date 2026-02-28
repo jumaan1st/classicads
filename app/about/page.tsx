@@ -1,8 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, Award, Users, Target, Sparkles, CheckCircle2, Zap, Shield, Star } from "lucide-react";
-
-type PageContent = { title: string; description: string };
+import { db } from "@/db";
+import { businessProfile, projects } from "@/db/schema";
+import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
+import { sql } from "drizzle-orm";
 type Profile = {
   ownerName?: string | null;
   shopName?: string | null;
@@ -37,28 +39,16 @@ function yearsOfExp(startedAt?: string | null): string {
 }
 
 export default async function AboutPage() {
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const content = getPageBySlug("about") as PageContent | null;
 
-  // Execute all server fetches concurrently for blazing fast render
-  const [contentRes, profileRes, projectsRes] = await Promise.all([
-    fetch(`${baseUrl}/api/pages?slug=about`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/profile/public`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/projects?limit=1000`, { next: { revalidate: 60 } }),
-  ]);
+  const profileRows = await db.select().from(businessProfile).limit(1);
+  const profile = profileRows[0] as Profile | undefined;
 
-  const rawContent = contentRes.ok ? await contentRes.json() : null;
-  const content = rawContent?.slug ? (rawContent as PageContent) : null;
-
-  const rawProfile = profileRes.ok ? await profileRes.json() : null;
-  const profile = (rawProfile?.profile ?? null) as Profile | null;
-
-  const rawProjects = projectsRes.ok ? await projectsRes.json() : null;
-  const totalProjects = rawProjects?.total ?? null;
+  const projectCountRow = await db.select({ count: sql<number>`count(*)` }).from(projects);
+  const totalProjects = Number(projectCountRow[0]?.count || 0);
 
   const stats = [
-    { value: totalProjects != null ? `${totalProjects}+` : "—", label: "Projects Delivered" },
+    { value: totalProjects > 0 ? `${totalProjects}+` : "10+", label: "Projects Delivered" },
     { value: yearsOfExp(profile?.startedBusinessAt), label: "Years of Experience" },
     { value: "100%", label: "Client Satisfaction" },
   ];

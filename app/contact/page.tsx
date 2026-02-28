@@ -1,10 +1,8 @@
 import WhatsAppContact from "@/components/WhatsAppContact";
 import MapEmbed from "@/components/MapEmbed";
-
-type PageContent = {
-  title: string;
-  description: string;
-};
+import { db } from "@/db";
+import { businessProfile } from "@/db/schema";
+import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
 
 type ContactDetails = {
   phone: string | null;
@@ -14,20 +12,17 @@ type ContactDetails = {
 };
 
 export default async function ContactPage() {
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const content = getPageBySlug("contact") as PageContent | null;
 
-  // Fetch page content and contact details concurrently on the server
-  const [contentRes, contactRes] = await Promise.all([
-    fetch(`${baseUrl}/api/pages?slug=contact`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/contact-details`, { next: { revalidate: 60 } }),
-  ]);
+  const profileRows = await db.select().from(businessProfile).limit(1);
+  const profile = profileRows[0];
 
-  const rawContent = contentRes.ok ? await contentRes.json() : null;
-  const content = rawContent?.slug ? (rawContent as PageContent) : null;
-
-  const contactDetails = contactRes.ok ? ((await contactRes.json()) as ContactDetails) : null;
+  const contactDetails: ContactDetails | null = profile ? {
+    phone: profile.phone ?? null,
+    email: profile.email ?? null,
+    mapEmbedUrl: profile.mapEmbedUrl ?? null,
+    shopName: profile.shopName ?? null,
+  } : null;
 
   return (
     <div className="bg-[var(--background)] min-h-screen flex flex-col">

@@ -1,5 +1,8 @@
 import ServicesClient from "@/components/ServicesClient";
-
+import { db } from "@/db";
+import { services, serviceGallery } from "@/db/schema";
+import { eq, desc, inArray } from "drizzle-orm";
+import { getPageBySlug, type PageContent } from "@/app/api/pages/store";
 type Service = {
   id: string;
   name: string;
@@ -13,23 +16,48 @@ type Service = {
 };
 
 export default async function ServicesPage() {
-  const baseUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  // Fetch initial services and content concurrently
-  const [contentRes, servicesRes] = await Promise.all([
-    fetch(`${baseUrl}/api/pages?slug=services`, { next: { revalidate: 60 } }),
-    fetch(`${baseUrl}/api/services?page=1&limit=100`, { next: { revalidate: 60 } }),
-  ]);
-
-  const rawContent = contentRes.ok ? await contentRes.json() : null;
-  const initialContent = rawContent?.slug
-    ? { title: rawContent.title, description: rawContent.description }
+  // 1. Fetch Page Content
+  const content = getPageBySlug("services") as PageContent | null;
+  const initialContent = content?.slug
+    ? { title: content.title, description: content.description }
     : null;
 
-  const rawServices = servicesRes.ok ? await servicesRes.json() : null;
-  const initialServices: Service[] = rawServices?.services ?? [];
+  // 2. Fetch Services from DB directly
+  const rawServices = await db
+    .select()
+    .from(services)
+    .where(eq(services.isDeleted, false))
+    .orderBy(desc(services.createdAt))
+    .limit(100);
+
+  const serviceIds = rawServices.map(s => s.id);
+  let allGalleryRows: any[] = [];
+  if (serviceIds.length > 0) {
+    allGalleryRows = await db
+      .select()
+      .from(serviceGallery)
+      .where(inArray(serviceGallery.serviceId, serviceIds));
+  }
+
+  const initialServices: Service[] = rawServices.map(s => {
+    const galleryUrls = allGalleryRows
+      .filter(g => g.serviceId === s.id)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+      .map(g => g.url);
+
+    return {
+      id: s.id,
+      name: s.name,
+      slug: s.slug,
+      category: s.category || "",
+      description: s.description || "",
+      priceRange: { min: s.minPrice || 0, max: s.maxPrice || 0 },
+      timelineWeeks: { min: s.minTimelineWeeks || 0, max: s.maxTimelineWeeks || 0 },
+      image: s.image || "",
+      featured: s.featured || false,
+      gallery: galleryUrls
+    } as Service;
+  });
 
   return (
     <ServicesClient

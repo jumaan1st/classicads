@@ -7,24 +7,23 @@ import { revalidatePath } from "next/cache";
 
 export async function PUT(
     req: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     const session = await getSession();
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     try {
+        const { id } = await params;
         const { status } = await req.json();
         if (!status) return NextResponse.json({ error: "Missing status" }, { status: 400 });
-
-        const invoiceId = params.id;
 
         await db
             .update(invoices)
             .set({ status, updatedAt: new Date() })
-            .where(eq(invoices.id, invoiceId));
+            .where(eq(invoices.id, id));
 
         revalidatePath("/dashboard/invoices");
-        revalidatePath(`/dashboard/invoices/${invoiceId}`);
+        revalidatePath(`/dashboard/invoices/${id}`);
 
         return NextResponse.json({ success: true, status });
     } catch (err) {

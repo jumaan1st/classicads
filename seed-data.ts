@@ -1,7 +1,6 @@
 import { db } from './db';
 import { services, serviceGallery, projects, projectServices, projectAssignments, projectMilestones, projectPhotos, users } from './db/schema';
 import { sql } from 'drizzle-orm';
-import { DUMMY_PROJECTS } from './app/api/projects/route';
 
 // We have 5 DUMMY_SERVICES hardcoded previously in app/api/services/route.ts
 // Re-declaring them here since they aren't exported cleanly
@@ -86,6 +85,30 @@ const DUMMY_SERVICES = [
         gallery: [
             "https://images.unsplash.com/photo-1558904541-efa84396aec2?w=600",
             "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=600",
+        ]
+    }
+];
+
+const DUMMY_PROJECTS = [
+    {
+        id: "proj_1",
+        title: "Mitchell Living Room Redesign",
+        clientName: "Sarah Mitchell",
+        clientEmail: "sarah.m@example.com",
+        status: "completed",
+        startDate: "2023-08-15",
+        endDate: "2023-10-20",
+        budget: 45000,
+        createdAt: "2023-08-01",
+        content: "A complete overhaul of a mid-century living space.",
+        serviceIds: ["1"],
+        assignedTo: ["EMP1"],
+        milestones: [
+            { id: "m1", title: "Design Approval", dueDate: "2023-08-30", completed: true, completedAt: "2023-08-28" },
+            { id: "m2", title: "Furniture Delivery", dueDate: "2023-10-05", completed: true, completedAt: "2023-10-02" }
+        ],
+        progressPhotos: [
+            { url: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=600", caption: "Finished living room", uploadedAt: "2023-10-20" }
         ]
     }
 ];

@@ -6,9 +6,10 @@ import { getSession } from "@/app/lib/db-session";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,7 +30,7 @@ export async function PUT(
       })
       .where(
         and(
-          eq(customers.id, params.id),
+          eq(customers.id, id),
           eq(customers.isDeleted, false)
         )
       )
@@ -43,9 +44,10 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -57,7 +59,7 @@ export async function DELETE(
         isDeleted: true,
         deletedAt: new Date(),
       })
-      .where(eq(customers.id, params.id));
+      .where(eq(customers.id, id));
 
     return NextResponse.json({ success: true });
   } catch (error) {
