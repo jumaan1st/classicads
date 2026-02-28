@@ -62,7 +62,8 @@ type FormData = {
     projectTitle: string;
     issueDate: string;
     dueDate: string;
-    gstPercent: string;
+    cgstPercent: string;
+    sgstPercent: string;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -145,7 +146,8 @@ export default function CreateInvoicePage() {
         projectTitle: "",
         issueDate: new Date().toISOString().split("T")[0],
         dueDate: "",
-        gstPercent: "18",
+        cgstPercent: "9",
+        sgstPercent: "9",
     });
 
     useEffect(() => {
@@ -171,19 +173,19 @@ export default function CreateInvoicePage() {
     // Click outside → hide dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
+            if (activeField && comboboxRef.current && !comboboxRef.current.contains(event.target as Node)) {
                 setShowSuggestions(false);
+                setActiveField(null);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
+    }, [activeField]);
 
     // Live filtering + backend fallback when few matches
     const filterAndSearch = useCallback(async (query: string) => {
-        if (!query.trim() || !activeField) {
+        if (!query.trim()) {
             setCustomerSuggestions(initialCustomers);
-            setShowSuggestions(false);
             return;
         }
 
@@ -197,7 +199,6 @@ export default function CreateInvoicePage() {
         });
 
         setCustomerSuggestions(filtered);
-        setShowSuggestions(true);
 
         // If very few matches left → ask backend for more
         if (filtered.length <= 3) {
@@ -208,27 +209,30 @@ export default function CreateInvoicePage() {
                     const newOnes = data.customers.filter(
                         (c: CustomerSuggestion) => !initialCustomers.some((ic) => ic.id === c.id)
                     );
-                    setInitialCustomers((prev) => [...prev, ...newOnes]);
-                    setCustomerSuggestions((prev) => {
-                        const unique = [...prev];
-                        newOnes.forEach((n: CustomerSuggestion) => {
-                            if (!unique.some(u => u.id === n.id)) unique.push(n);
+                    if (newOnes.length > 0) {
+                        setInitialCustomers((prev) => [...prev, ...newOnes]);
+                        setCustomerSuggestions((prev) => {
+                            const unique = [...prev];
+                            newOnes.forEach((n: CustomerSuggestion) => {
+                                if (!unique.some(u => u.id === n.id)) unique.push(n);
+                            });
+                            return unique;
                         });
-                        return unique;
-                    });
+                    }
                 }
             } catch (err) {
                 console.error("Customer search failed", err);
             }
         }
-    }, [initialCustomers, activeField]);
+    }, [initialCustomers]);
 
     useEffect(() => {
         if (activeField) {
-            const query = activeField === "clientName" ? customerQuery : formData[activeField];
-            filterAndSearch(query);
+            const query = activeField === "clientName" ? formData.clientName : formData[activeField];
+            const timeoutId = setTimeout(() => filterAndSearch(query), 150);
+            return () => clearTimeout(timeoutId);
         }
-    }, [customerQuery, formData.clientEmail, formData.clientNumber, activeField, filterAndSearch]);
+    }, [formData.clientName, formData.clientEmail, formData.clientNumber, activeField, filterAndSearch]);
 
     const selectCustomer = (cust: CustomerSuggestion) => {
         setFormData({
@@ -239,11 +243,9 @@ export default function CreateInvoicePage() {
             clientGst: cust.gstNumber || (cust.notes?.includes("GST:") ? cust.notes.replace("GST: ", "").trim() : ""),
         });
         setSelectedCustomerId(cust.id);
-        setCustomerQuery(cust.name);
         // Fix: Force close suggestions and clear active field
         setShowSuggestions(false);
         setActiveField(null);
-        setCustomerSuggestions([]);
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -251,7 +253,6 @@ export default function CreateInvoicePage() {
         setFormData({ ...formData, [name]: value });
         if (name === "clientName") {
             setSelectedCustomerId(null);
-            setCustomerQuery(value);
         }
     };
 
@@ -295,29 +296,36 @@ export default function CreateInvoicePage() {
         setMiscItems((prev) => prev.filter((m) => m.id !== id));
 
     const calculateTotal = () => {
-        const gstPct = parseFloat(formData.gstPercent) || 0;
+        const cgstPct = parseFloat(formData.cgstPercent) || 0;
+        const sgstPct = parseFloat(formData.sgstPercent) || 0;
+        const totalTaxPct = cgstPct + sgstPct;
 
         const rawServiceTotal = selectedServices.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
         const rawMiscTotal = miscItems.reduce((s, x) => s + (parseFloat(x.amount) || 0), 0);
         const rawItemsSum = rawServiceTotal + rawMiscTotal;
 
-        let total, subtotal, gstAmt;
+        let total, subtotal, cgstAmt, sgstAmt;
 
         if (isTaxInclusive) {
-            // Entered amounts include tax
             total = rawItemsSum;
-            subtotal = total / (1 + gstPct / 100);
-            gstAmt = total - subtotal;
+            subtotal = total / (1 + totalTaxPct / 100);
+
+            // Distribute tax proportionally
+            const totalTaxAmount = total - subtotal;
+            const cgstRatio = cgstPct === 0 && sgstPct === 0 ? 0 : cgstPct / totalTaxPct;
+
+            cgstAmt = totalTaxAmount * cgstRatio;
+            sgstAmt = totalTaxAmount - cgstAmt;
         } else {
-            // Entered amounts exclude tax
             subtotal = rawItemsSum;
-            total = subtotal * (1 + gstPct / 100);
-            gstAmt = total - subtotal;
+            cgstAmt = subtotal * (cgstPct / 100);
+            sgstAmt = subtotal * (sgstPct / 100);
+            total = subtotal + cgstAmt + sgstAmt;
         }
 
-        return { serviceTotal: rawServiceTotal, miscTotal: rawMiscTotal, subtotal, gstAmt, total, adjustment: 0 };
+        return { serviceTotal: rawServiceTotal, miscTotal: rawMiscTotal, subtotal, cgstAmt, sgstAmt, total, adjustment: 0 };
     };
-    const { serviceTotal, miscTotal, subtotal, gstAmt, total, adjustment } = calculateTotal();
+    const { serviceTotal, miscTotal, subtotal, cgstAmt, sgstAmt, total, adjustment } = calculateTotal();
 
     const canStep1 =
         formData.clientName.trim() &&
@@ -412,9 +420,11 @@ export default function CreateInvoicePage() {
                 projectTitle: formData.projectTitle,
                 issueDate: formData.issueDate,
                 dueDate: formData.dueDate || null,
-                gstPercent: formData.gstPercent,
+                cgstPercent: formData.cgstPercent,
+                sgstPercent: formData.sgstPercent,
                 subtotal: subtotal.toFixed(2),
-                gstAmount: gstAmt.toFixed(2),
+                cgstAmount: cgstAmt.toFixed(2),
+                sgstAmount: sgstAmt.toFixed(2),
                 total: total.toFixed(2),
                 status: markedPaid ? "paid" : "draft",
                 items: [
@@ -543,19 +553,16 @@ export default function CreateInvoicePage() {
                             <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500"><FileText className="w-5 h-5" /></div>
                             <h2 className="text-xl font-heading font-bold text-[var(--foreground)]">Client Details</h2>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5" ref={comboboxRef}>
                             {/* ── Client Name with search ─────── */}
-                            <div className="space-y-2 relative" ref={comboboxRef}>
+                            <div className="space-y-2 relative">
                                 <label className="text-sm font-medium text-[var(--foreground)]">Client Name *</label>
                                 <div className="relative">
                                     <input
                                         type="text"
                                         name="clientName"
-                                        value={customerQuery}
-                                        onChange={(e) => {
-                                            setCustomerQuery(e.target.value);
-                                            handleChange(e);
-                                        }}
+                                        value={formData.clientName}
+                                        onChange={handleChange}
                                         onFocus={() => {
                                             setActiveField("clientName");
                                             setShowSuggestions(true);
@@ -592,7 +599,7 @@ export default function CreateInvoicePage() {
                             {[
                                 { label: "Email (Optional)", name: "clientEmail", type: "email", placeholder: "e.g. john@example.com", icon: Search },
                                 { label: "Phone (Optional)", name: "clientNumber", type: "text", placeholder: "e.g. +91 98765 43210", icon: Search },
-                                { label: "GST Number (Optional)", name: "clientGst", type: "text", placeholder: "e.g. 29ABCDE1234F1Z5" },
+                                { label: "GST Number (Optional)", name: "clientGst", type: "text", placeholder: "e.g. 29ABCDE1234F1Z5", icon: Search },
                             ].map((f) => (
                                 <div key={f.name} className="space-y-2 relative">
                                     <label className="text-sm font-medium text-[var(--foreground)]">{f.label}</label>
@@ -603,18 +610,15 @@ export default function CreateInvoicePage() {
                                             value={formData[f.name as keyof FormData]}
                                             onChange={handleChange}
                                             onFocus={() => {
-                                                if (f.name === "clientEmail" || f.name === "clientNumber") {
+                                                if (f.name === "clientEmail" || f.name === "clientNumber" || f.name === "clientGst") {
                                                     setActiveField(f.name as any);
                                                     setShowSuggestions(true);
-                                                } else {
-                                                    setActiveField(null);
-                                                    setShowSuggestions(false);
                                                 }
                                             }}
-                                            className={`w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors ${f.icon ? "pl-10" : ""}`}
+                                            className={`w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors ${f.icon !== undefined ? "pl-10" : ""}`}
                                             placeholder={f.placeholder}
                                         />
-                                        {f.icon && <f.icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />}
+                                        {f.icon !== undefined && <f.icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" />}
                                     </div>
 
                                     {showSuggestions && activeField === f.name && customerSuggestions.length > 0 && (
@@ -653,6 +657,18 @@ export default function CreateInvoicePage() {
                                 <label className="text-sm font-medium text-[var(--foreground)]">Due Date *</label>
                                 <input required type="date" name="dueDate" value={formData.dueDate} onChange={handleChange}
                                     className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors [&::-webkit-calendar-picker-indicator]:invert" />
+                            </div>
+
+                            {/* Move GST fields to Step 1 for better visibility */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-[var(--muted)]">CGST %</label>
+                                <input type="number" name="cgstPercent" value={formData.cgstPercent} onChange={handleChange}
+                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-[var(--muted)]">SGST %</label>
+                                <input type="number" name="sgstPercent" value={formData.sgstPercent} onChange={handleChange}
+                                    className="w-full bg-[var(--background)] border border-[var(--border)] rounded-xl px-4 py-2.5 text-[var(--foreground)] focus:outline-none focus:border-blue-500 transition-colors" />
                             </div>
                         </div>
                     </Card>
@@ -780,12 +796,7 @@ export default function CreateInvoicePage() {
 
                         {/* Live Totals (services only) */}
                         {selectedServices.length > 0 && (
-                            <div className="mt-8 pt-6 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-end justify-between gap-6">
-                                <div className="flex items-center gap-3">
-                                    <label className="text-sm font-medium text-[var(--muted)] whitespace-nowrap">GST %</label>
-                                    <input type="number" name="gstPercent" value={formData.gstPercent} onChange={handleChange}
-                                        className="w-20 bg-[var(--background)] border border-[var(--border)] rounded-lg text-center py-2 text-[var(--foreground)] focus:outline-none focus:border-blue-500" />
-                                </div>
+                            <div className="mt-8 pt-6 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-end justify-end gap-6 text-right">
                                 <div className="space-y-2 min-w-[220px]">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-[var(--muted)]">Items {isTaxInclusive ? "(Incl. GST)" : "(Excl. GST)"}</span>
@@ -886,8 +897,12 @@ export default function CreateInvoicePage() {
                                 </div>
                             )}
                             <div className="flex justify-between text-sm">
-                                <span className="text-[var(--muted)]">GST ({formData.gstPercent}%)</span>
-                                <span className="font-medium text-[var(--foreground)]">₹{gstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                <span className="text-[var(--muted)]">CGST ({formData.cgstPercent}%)</span>
+                                <span className="font-medium text-[var(--foreground)]">₹{cgstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-[var(--muted)]">SGST ({formData.sgstPercent}%)</span>
+                                <span className="font-medium text-[var(--foreground)]">₹{sgstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between text-lg font-bold border-t border-[var(--border)] pt-3 mt-4">
                                 <span className="text-[var(--foreground)]">Total</span>
@@ -1085,8 +1100,12 @@ export default function CreateInvoicePage() {
                                                             <span className="font-medium text-[var(--foreground)]">INR {subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                         </div>
                                                         <div className="flex justify-between text-sm py-1">
-                                                            <span className="text-[var(--muted)]">GST ({formData.gstPercent}%)</span>
-                                                            <span className="font-medium text-[var(--foreground)]">INR {gstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                            <span className="text-[var(--muted)]">CGST ({formData.cgstPercent}%)</span>
+                                                            <span className="font-medium text-[var(--foreground)]">INR {cgstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                        </div>
+                                                        <div className="flex justify-between text-sm py-1">
+                                                            <span className="text-[var(--muted)]">SGST ({formData.sgstPercent}%)</span>
+                                                            <span className="font-medium text-[var(--foreground)]">INR {sgstAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                         </div>
                                                         <div className="flex justify-between items-center bg-[var(--muted-bg)] p-4 rounded-xl border border-[var(--border)] mt-4">
                                                             <span className="text-[var(--foreground)] font-bold">Total Due</span>
@@ -1132,7 +1151,7 @@ export default function CreateInvoicePage() {
                         </button>
                         <button type="submit" disabled={saveLoading}
                             className={`flex items-center gap-2 px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition-all duration-300 disabled:opacity-50 text-sm sm:text-base ${markedPaid ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20" : "bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20"}`}>
-                            {saveLoading ? "Saving..." : <><Save className="w-5 h-5" /> Save {markedPaid ? "as Paid" : "& Send"}</>}
+                            {saveLoading ? "Saving..." : <><Save className="w-5 h-5" /> Save Invoice</>}
                         </button>
                     </div>
                 </form>

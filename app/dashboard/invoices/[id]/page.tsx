@@ -28,8 +28,10 @@ type InvoiceDetailed = {
     dueDate: string;
     status: string;
     subtotal: number;
-    gstPercent: number;
-    gstAmount: number;
+    cgstPercent: number;
+    sgstPercent: number;
+    cgstAmount: number;
+    sgstAmount: number;
     total: number;
     currency: string;
     items: InvoiceItem[];
@@ -270,7 +272,7 @@ export default function ViewInvoicePage() {
     };
 
     useEffect(() => {
-        fetch(`/api/invoices?id=${params.id}`)
+        fetch(`/api/invoices?id=${params.id}&t=${Date.now()}`)
             .then((r) => r.json())
             .then((data) => {
                 if (!data.error) {
@@ -549,8 +551,12 @@ export default function ViewInvoicePage() {
                                                     <span className="font-medium text-[var(--foreground)]">{invoice.currency} {invoice.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="flex justify-between text-sm py-1">
-                                                    <span className="text-[var(--muted)]">GST ({invoice.gstPercent}%)</span>
-                                                    <span className="font-medium text-[var(--foreground)]">{invoice.currency} {invoice.gstAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                    <span className="text-[var(--muted)]">CGST ({invoice.cgstPercent}%)</span>
+                                                    <span className="font-medium text-[var(--foreground)]">{invoice.currency} {invoice.cgstAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                                <div className="flex justify-between text-sm py-1">
+                                                    <span className="text-[var(--muted)]">SGST ({invoice.sgstPercent}%)</span>
+                                                    <span className="font-medium text-[var(--foreground)]">{invoice.currency} {invoice.sgstAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center bg-[var(--muted-bg)] p-4 rounded-xl border border-[var(--border)] mt-4 shadow-inner">
                                                     <span className="text-[var(--foreground)] font-bold">Total Due</span>

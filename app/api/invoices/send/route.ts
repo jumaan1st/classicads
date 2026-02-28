@@ -30,7 +30,8 @@ export async function POST(req: NextRequest) {
                 issueDate: invoices.issueDate,
                 dueDate: invoices.dueDate,
                 subtotal: invoices.subtotal,
-                gstAmount: invoices.gstAmount,
+                cgstAmount: invoices.cgstAmount,
+                sgstAmount: invoices.sgstAmount,
                 total: invoices.total,
                 status: invoices.status,
                 clientName: customers.name,
@@ -94,8 +95,16 @@ export async function POST(req: NextRequest) {
             <div class="summary-box">
               <table style="width: 100%; border-collapse: collapse;">
                 <tr>
-                  <td style="color: ${textMuted}; font-size: 14px; padding-bottom: 8px;">Due Date</td>
-                  <td style="color: ${textDark}; font-size: 14px; padding-bottom: 8px; text-align: right;">${new Date(invoice.dueDate).toLocaleDateString()}</td>
+                  <td style="color: ${textMuted}; font-size: 14px; padding-bottom: 8px;">Subtotal</td>
+                  <td style="color: ${textDark}; font-size: 14px; padding-bottom: 8px; text-align: right;">${currency} ${Number(invoice.subtotal).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td style="color: ${textMuted}; font-size: 14px; padding-bottom: 8px;">CGST</td>
+                  <td style="color: ${textDark}; font-size: 14px; padding-bottom: 8px; text-align: right;">${currency} ${Number(invoice.cgstAmount).toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td style="color: ${textMuted}; font-size: 14px; padding-bottom: 8px;">SGST</td>
+                  <td style="color: ${textDark}; font-size: 14px; padding-bottom: 8px; text-align: right;">${currency} ${Number(invoice.sgstAmount).toLocaleString()}</td>
                 </tr>
                 <tr class="total-row">
                   <td style="padding-top: 12px; border-top: 1px solid ${borderCol};">Total Amount</td>

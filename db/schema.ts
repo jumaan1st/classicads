@@ -165,8 +165,10 @@ export const invoices = pgTable("invoices", {
     dueDate: timestamp("due_date").notNull(),
 
     subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
-    gstPercent: decimal("gst_percent", { precision: 5, scale: 2 }).notNull(),
-    gstAmount: decimal("gst_amount", { precision: 12, scale: 2 }).notNull(),
+    cgstPercent: decimal("cgst_percent", { precision: 5, scale: 2 }).notNull(),
+    sgstPercent: decimal("sgst_percent", { precision: 5, scale: 2 }).notNull(),
+    cgstAmount: decimal("cgst_amount", { precision: 12, scale: 2 }).notNull(),
+    sgstAmount: decimal("sgst_amount", { precision: 12, scale: 2 }).notNull(),
     total: decimal("total", { precision: 12, scale: 2 }).notNull(),
 
     notes: varchar("notes", { length: 500 }),
