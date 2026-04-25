@@ -1,86 +1,40 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import Link from "next/link";
-import { ArrowLeft, Download, Send, Printer, FileText, CheckCircle2, ZoomIn, ZoomOut, Maximize, Minimize, ToggleLeft, ToggleRight } from "lucide-react";
+import { Download, Printer, FileText, CheckCircle2, ShieldCheck, ZoomIn, ZoomOut, Maximize, Minimize } from "lucide-react";
 import Card from "@/components/Card";
 import { useParams } from "next/navigation";
 import { generateInvoicePDF } from "@/app/lib/pdf-generator";
-import jsPDF from "jspdf";
 import { QRCodeSVG } from "qrcode.react";
 
-type InvoiceItem = {
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    amount: number;
-};
-
-type InvoiceDetailed = {
-    id: string;
-    invoiceNumber: string;
-    projectTitle: string;
-    clientName: string;
-    clientEmail?: string;
-    clientNumber?: string;
-    clientGst?: string;
-    issueDate: string;
-    dueDate: string;
-    status: string;
-    subtotal: number;
-    cgstPercent: number;
-    sgstPercent: number;
-    cgstAmount: number;
-    sgstAmount: number;
-    total: number;
-    currency: string;
-    items: InvoiceItem[];
-};
-
-type BusinessProfile = {
-    id: string;
-    ownerName: string | null;
-    shopName: string | null;
-    profileImage: string | null;
-    signatureImage: string | null;
-    upiId: string | null;
-    gstNumber: string | null;
-    phone: string | null;
-    email: string | null;
-    address: string | null;
-};
-
-const statusColors: Record<string, string> = {
-    draft: "bg-[var(--muted-bg)] text-[var(--muted)] border-[var(--border)]",
-    sent: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-    paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-    overdue: "bg-red-500/10 text-red-500 border-red-500/20",
-};
-
-export default function ViewInvoicePage() {
+export default function VerifyInvoicePage() {
     const params = useParams();
     const documentRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const [invoice, setInvoice] = useState<InvoiceDetailed | null>(null);
+    
+    // Note: 'any' type used purely for view bridging
+    const [invoice, setInvoice] = useState<any>(null);
+    const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isDownloading, setIsDownloading] = useState(false);
-    const [paidStatus, setPaidStatus] = useState<string>("draft");
-    const [profile, setProfile] = useState<BusinessProfile | null>(null);
-    const [isSendingEmail, setIsSendingEmail] = useState(false);
-    const [emailSuccess, setEmailSuccess] = useState<boolean | null>(null);
-    const [statusLoading, setStatusLoading] = useState(false);
-
-    useEffect(() => {
-        fetch("/api/profile")
-            .then(r => r.json())
-            .then(data => setProfile(data.profile))
-            .catch(err => console.error("Profile fetch error:", err));
-    }, []);
-
+    
     const [scale, setScale] = useState(1);
     const [contentHeight, setContentHeight] = useState(1200);
     const [isFullScreen, setIsFullScreen] = useState(false);
+
+    useEffect(() => {
+        fetch(`/api/verify?id=${params.id}`)
+            .then((r) => r.json())
+            .then((data) => {
+                if (!data.error && data.invoice) {
+                    setInvoice({ ...data.invoice, clientNumber: data.invoice.clientNumber || "+91 98765 00000", clientGst: data.invoice.clientGst || "29AAAAA0000A1Z5" });
+                    setProfile(data.profile);
+                }
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, [params.id]);
 
     useEffect(() => {
         const recalculate = () => {
@@ -92,13 +46,10 @@ export default function ViewInvoicePage() {
             setScale(Math.max(0.2, newScale));
             if (documentRef.current) setContentHeight(documentRef.current.offsetHeight);
         };
-
         const containerObserver = new ResizeObserver(recalculate);
         if (scrollContainerRef.current) containerObserver.observe(scrollContainerRef.current);
-
         const docObserver = new ResizeObserver(recalculate);
         if (documentRef.current) docObserver.observe(documentRef.current);
-
         recalculate();
         return () => { containerObserver.disconnect(); docObserver.disconnect(); };
     }, [invoice, isFullScreen]);
@@ -109,118 +60,11 @@ export default function ViewInvoicePage() {
         return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
     }, []);
 
-    useEffect(() => {
-        const container = viewerRef.current;
-        if (!container) return;
-        let startDist = 0;
-
-        const onTouchStart = (e: TouchEvent) => {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                startDist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-            }
-        };
-
-        const onTouchMove = (e: TouchEvent) => {
-            if (e.touches.length === 2) {
-                e.preventDefault();
-                const dist = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                const delta = dist - startDist;
-                if (Math.abs(delta) > 5) {
-                    setScale(s => Math.min(Math.max(0.3, s + delta * 0.005), 3));
-                    startDist = dist;
-                }
-            }
-        };
-
-        container.addEventListener("touchstart", onTouchStart, { passive: false });
-        container.addEventListener("touchmove", onTouchMove, { passive: false });
-        return () => {
-            container.removeEventListener("touchstart", onTouchStart);
-            container.removeEventListener("touchmove", onTouchMove);
-        };
-    }, []);
-
     const toggleFullScreen = () => {
         if (!document.fullscreenElement) {
             viewerRef.current?.requestFullscreen().catch(err => console.error(err));
         } else {
             document.exitFullscreen();
-        }
-    };
-
-    const togglePaidStatus = async () => {
-        if (!invoice || statusLoading) return;
-        const newStatus = paidStatus === "paid" ? "sent" : "paid";
-        setStatusLoading(true);
-        try {
-            const res = await fetch(`/api/invoices/${invoice.id}/status`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
-            });
-            if (res.ok) {
-                setPaidStatus(newStatus);
-            } else {
-                alert("Failed to update status");
-            }
-        } catch (err) {
-            console.error("Status update error:", err);
-            alert("Error updating status");
-        } finally {
-            setStatusLoading(false);
-        }
-    };
-
-    const handleSendEmail = async () => {
-        if (!invoice || !profile || isSendingEmail) return;
-        setIsSendingEmail(true);
-        setEmailSuccess(null);
-        try {
-            const pdf = await generateInvoicePDF(invoice, profile);
-            if (!pdf) throw new Error("Failed to generate PDF");
-
-            // 2. Convert to Base64
-            const pdfBlob = pdf.output("blob");
-            const reader = new FileReader();
-            const base64Promise = new Promise<string>((resolve) => {
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(pdfBlob);
-            });
-            const pdfBase64 = await base64Promise;
-
-            // 3. Send to API
-            const res = await fetch("/api/invoices/send", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    invoiceId: invoice.id,
-                    pdfData: pdfBase64,
-                    fileName: `Invoice-${invoice.invoiceNumber}.pdf`
-                }),
-            });
-
-            if (res.ok) {
-                setEmailSuccess(true);
-                setPaidStatus("sent");
-                setTimeout(() => setEmailSuccess(null), 3000);
-            } else {
-                setEmailSuccess(false);
-                const data = await res.json();
-                alert(data.error || "Failed to send email");
-            }
-        } catch (err) {
-            console.error("Email error:", err);
-            setEmailSuccess(false);
-            alert("Error sending email");
-        } finally {
-            setIsSendingEmail(false);
         }
     };
 
@@ -234,9 +78,7 @@ export default function ViewInvoicePage() {
             iframe.style.display = "none";
             iframe.src = blobUrl;
             document.body.appendChild(iframe);
-            iframe.onload = () => {
-                iframe.contentWindow?.print();
-            };
+            iframe.onload = () => { iframe.contentWindow?.print(); };
             setTimeout(() => { document.body.removeChild(iframe); URL.revokeObjectURL(blobUrl); }, 1000 * 60 * 5);
         } catch (error) {
             console.error("Error creating print PDF:", error);
@@ -258,23 +100,11 @@ export default function ViewInvoicePage() {
         }
     };
 
-    useEffect(() => {
-        fetch(`/api/invoices?id=${params.id}&t=${Date.now()}`)
-            .then((r) => r.json())
-            .then((data) => {
-                if (!data.error) {
-                    setInvoice({ ...data, clientNumber: "+91 98765 00000", clientGst: "29AAAAA0000A1Z5" });
-                    setPaidStatus(data.status);
-                }
-            })
-            .finally(() => setLoading(false));
-    }, [params.id]);
-
     if (loading) {
         return (
-            <div className="space-y-6 max-w-4xl mx-auto">
-                <div className="h-10 w-48 animate-pulse rounded-lg bg-[var(--muted-bg)]" />
-                <div className="h-[600px] animate-pulse rounded-2xl bg-[var(--muted-bg)]" />
+            <div className="space-y-6 max-w-4xl mx-auto p-6 mt-10">
+                <div className="h-12 w-full animate-pulse rounded-lg bg-[var(--muted-bg)]" />
+                <div className="h-[600px] animate-pulse rounded-2xl bg-[var(--muted-bg)] mt-4" />
             </div>
         );
     }
@@ -283,176 +113,62 @@ export default function ViewInvoicePage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-[50vh] text-[var(--muted)]">
                 <FileText className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-xl font-heading mb-4">Invoice not found</p>
-                <Link href="/dashboard/invoices" className="px-6 py-2 bg-[var(--foreground)] text-[var(--background)] font-medium rounded-lg">Return to Invoices</Link>
+                <p className="text-xl font-heading mb-2">Secure Invoice Not Found</p>
+                <p className="text-sm">The requested document might have been deleted or doesn't exist.</p>
             </div>
         );
     }
 
-    const isPaid = paidStatus === "paid";
+    const isPaid = invoice.status === "paid";
 
     return (
-        <div className="space-y-6 max-w-4xl mx-auto pb-12">
+        <div className="space-y-6 max-w-4xl mx-auto pb-12 pt-8 px-4 sm:px-0">
             <style dangerouslySetInnerHTML={{
                 __html: `
                 @media print {
                     @page { size: A4; margin-top: 15mm; margin-bottom: 15mm; margin-left: 0 !important; margin-right: 0 !important; }
-                    
-                    /* The Holy Grail: No margin on the very first page so the top banner touches the absolute edge natively */
                     @page :first { margin-top: 0 !important; }
-                    
                     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: white; }
-                    
-                    /* Hide Dashboard specific layout wrappers safely */
                     aside, header, nav, footer { display: none !important; }
-                    
-                    /* CSS MAGIC: Reset ANY layout wrapper that contains the print section */
-                    html, body, *:has(#print-section) {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        border: none !important;
-                        width: 100vw !important;
-                        max-width: none !important;
-                        height: auto !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        position: static !important;
-                        transform: none !important;
-                        box-shadow: none !important;
-                        background: transparent !important;
-                        box-sizing: border-box !important;
-                    }
-                    
-                    /* Ensure the actual printing section spans and scales properly */
-                    #print-section { 
-                        position: static !important; 
-                        transform: none !important; 
-                        width: 100vw !important; 
-                        max-width: none !important;
-                        box-shadow: none !important; 
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        border: none !important;
-                        border-radius: 0 !important;
-                        box-sizing: border-box !important;
-                    }
-                    
+                    html, body, *:has(#print-section) { margin: 0 !important; padding: 0 !important; border: none !important; width: 100vw !important; max-width: none !important; height: auto !important; max-height: none !important; overflow: visible !important; position: static !important; transform: none !important; box-shadow: none !important; background: transparent !important; box-sizing: border-box !important; }
+                    #print-section { position: static !important; transform: none !important; width: 100vw !important; max-width: none !important; box-shadow: none !important; margin: 0 !important; padding: 0 !important; border: none !important; border-radius: 0 !important; box-sizing: border-box !important; }
                     .dark { color-scheme: light !important; }
-                    .print-break-inside-avoid { break-inside: avoid; page-break-inside: avoid; }
-                    tr { page-break-inside: avoid; break-inside: avoid; }
                 }
             `}} />
 
-            {/* Header Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-                <div className="flex items-center gap-4">
-                    <Link
-                        href="/dashboard/invoices"
-                        className="p-2 rounded-full hover:bg-[var(--muted-bg)] border border-transparent hover:border-[var(--border)] transition-all text-[var(--muted)] hover:text-[var(--foreground)]"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
+            {/* Public Header Badge */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden px-4 md:px-0">
+                <div className="flex items-center gap-3 bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 px-4 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900/50">
+                    <ShieldCheck className="w-5 h-5 flex-shrink-0" />
                     <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="font-heading text-2xl font-bold text-[var(--foreground)] tracking-tight">
-                                {invoice.invoiceNumber}
-                            </h1>
-                            <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-md border ${statusColors[paidStatus] || statusColors.draft}`}>
-                                {paidStatus}
-                            </span>
-                        </div>
+                        <h2 className="text-sm font-bold tracking-tight leading-none mb-1">Official Document Interface</h2>
+                        <p className="text-[10px] uppercase font-bold opacity-70 tracking-wider">Read-Only verification mode</p>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:gap-3">
-                    {/* Mark Paid/Unpaid toggle */}
-                    <button
-                        onClick={togglePaidStatus}
-                        disabled={statusLoading}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border transition-all text-xs font-bold ${isPaid
-                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-500"
-                            : "bg-[var(--muted-bg)] border-[var(--border)] text-[var(--foreground)] hover:bg-emerald-500/10 hover:border-emerald-500/30 hover:text-emerald-500"
-                            } ${statusLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-                        title={isPaid ? "Mark as Unpaid" : "Mark as Paid"}
-                    >
-                        {statusLoading ? (
-                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                        ) : isPaid ? (
-                            <ToggleRight className="w-4 h-4" />
-                        ) : (
-                            <ToggleLeft className="w-4 h-4" />
-                        )}
-                        <span className="hidden sm:inline">{statusLoading ? "Updating..." : isPaid ? "Paid" : "Mark Paid"}</span>
-                    </button>
-
-                    <button
-                        onClick={handleDownloadPDF}
-                        disabled={isDownloading}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted-bg)] transition-colors text-xs text-sm font-semibold disabled:opacity-50"
-                    >
-                        <Download className="w-4 h-4" />
-                        <span className="hidden sm:inline">{isDownloading ? "Saving..." : "PDF"}</span>
-                    </button>
-                    <button
-                        onClick={handlePrint}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted-bg)] transition-colors text-xs text-sm font-semibold"
-                    >
-                        <Printer className="w-4 h-4" />
-                        <span className="hidden sm:inline">Print</span>
-                    </button>
-                    <button
-                        onClick={handleSendEmail}
-                        disabled={isSendingEmail}
-                        className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg text-xs text-sm font-bold ${emailSuccess === true
-                            ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
-                            : emailSuccess === false
-                                ? "bg-red-600 hover:bg-red-500 shadow-red-500/20"
-                                : "bg-blue-600 hover:bg-blue-500 shadow-blue-500/20"
-                            } text-white disabled:opacity-50`}
-                    >
-                        {isSendingEmail ? (
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : emailSuccess === true ? (
-                            <CheckCircle2 className="w-4 h-4" />
-                        ) : (
-                            <Send className="w-4 h-4" />
-                        )}
-                        <span className="hidden sm:inline">
-                            {isSendingEmail ? "Sending..." : emailSuccess === true ? "Sent!" : emailSuccess === false ? "Failed" : "Send Email"}
-                        </span>
-                    </button>
+                <div className="flex gap-2">
+                    <button onClick={handleDownloadPDF} disabled={isDownloading} className="flex items-center gap-2 px-4 py-2 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted-bg)] transition-colors text-sm font-semibold disabled:opacity-50 shadow-sm"><Download className="w-4 h-4" /><span className="hidden sm:inline">{isDownloading ? "Saving..." : "Download"}</span></button>
+                    <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-transparent text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--muted-bg)] transition-colors text-sm font-semibold shadow-sm"><Printer className="w-4 h-4" /><span className="hidden sm:inline">Print</span></button>
                 </div>
             </div>
 
             {/* Document Viewer */}
-            <div ref={viewerRef} className="w-full flex-col flex items-center bg-[var(--background)] sm:bg-[var(--muted-bg)]/20 mt-4 border-y border-[var(--border)] sm:border sm:rounded-xl overflow-hidden print:border-none print:mt-0 print:bg-transparent">
-
-                {/* Viewer Controls */}
-                <div className="w-full h-12 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between px-4 print:hidden shrink-0 shadow-sm z-10 relative">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Preview Document</span>
+            <div ref={viewerRef} className="w-full flex-col flex items-center bg-[var(--background)] sm:bg-[var(--muted-bg)]/20 border-y border-[var(--border)] sm:border sm:rounded-xl overflow-hidden print:border-none print:mt-0 print:bg-transparent shadow-sm">
+                
+                {/* Controls */}
+                <div className="w-full h-12 border-b border-[var(--border)] bg-[var(--card)] flex items-center justify-between px-4 print:hidden shrink-0 shadow-sm z-10">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--muted)]">Document Rendering</span>
                     <div className="flex items-center gap-1.5 sm:gap-3 bg-[var(--muted-bg)] p-1 rounded-lg border border-[var(--border)]">
-                        <button onClick={() => setScale(s => Math.max(0.3, s - 0.1))} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"><ZoomOut className="w-4 h-4" /></button>
+                        <button onClick={() => setScale(s => Math.max(0.3, s - 0.1))} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)]"><ZoomOut className="w-4 h-4" /></button>
                         <span className="text-xs font-mono w-12 text-center font-medium text-[var(--foreground)]">{Math.round(scale * 100)}%</span>
-                        <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)] transition-colors"><ZoomIn className="w-4 h-4" /></button>
+                        <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)]"><ZoomIn className="w-4 h-4" /></button>
                         <div className="w-px h-4 bg-[var(--border)] mx-1" />
-                        <button onClick={toggleFullScreen} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)] transition-colors" title={isFullScreen ? "Exit Fullscreen" : "Fullscreen"}>
-                            {isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-                        </button>
+                        <button onClick={toggleFullScreen} className="p-1.5 hover:bg-[var(--background)] rounded-md text-[var(--muted)] hover:text-[var(--foreground)]">{isFullScreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}</button>
                     </div>
                 </div>
 
-                {/* PDF Scroll Area */}
-                <div
-                    ref={scrollContainerRef}
-                    className="w-full overflow-auto flex justify-center py-4 sm:py-8 custom-scrollbar bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0 print:m-0"
-                    style={{ height: isFullScreen ? 'calc(100vh - 48px)' : 'calc(100vh - 200px)', touchAction: 'pan-x pan-y' }}
-                >
+                <div ref={scrollContainerRef} className="w-full overflow-auto flex justify-center py-4 sm:py-8 bg-neutral-100 dark:bg-neutral-800/40 print:bg-transparent print:p-0 print:m-0" style={{ height: isFullScreen ? 'calc(100vh - 48px)' : 'calc(100vh - 200px)' }}>
                     <div className="print-reset-wrapper" style={{ width: `${800 * scale}px`, height: `${contentHeight * scale}px`, flexShrink: 0, position: 'relative' }}>
-                        <div
-                            id="print-section"
-                            ref={documentRef}
-                            style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: '800px', position: 'absolute', left: 0, top: 0 }}
-                            className="bg-white dark:bg-[var(--card)] shadow-2xl print:shadow-none rounded-xl print:rounded-none print:!w-full print:!h-auto print:!static print:transform-none"
-                        >
+                        <div id="print-section" ref={documentRef} style={{ transform: `scale(${scale})`, transformOrigin: 'top left', width: '800px', position: 'absolute', left: 0, top: 0 }} className="bg-white dark:bg-[var(--card)] shadow-2xl print:shadow-none rounded-xl print:rounded-none print:!w-full print:!h-auto print:!static print:transform-none">
                             <Card className="p-0 border border-[var(--border)] relative overflow-hidden rounded-xl bg-white dark:bg-[var(--card)] print:bg-transparent print:border-none print:shadow-none print:rounded-none">
                                 <div className="w-full">
                                     {/* 1. Header section (24px 32px padding) */}
