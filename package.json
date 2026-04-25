@@ -11,6 +11,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.997.0",
     "@types/qrcode": "^1.5.6",
+    "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "dotenv": "^17.3.1",
@@ -27,7 +28,8 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "ua-parser-js": "^2.0.9"
+    "ua-parser-js": "^2.0.9",
+    "uuid": "^14.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
